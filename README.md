@@ -78,6 +78,8 @@ TORCH_INDEX_URL=https://download.pytorch.org/whl/cu121 \
 ./scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
 ```
 
+Trên Ubuntu 24.04, script này mặc định dùng `python3` của hệ thống, tức thường là Python 3.12.
+
 Chế độ nhẹ để kiểm tra nhanh:
 
 ```bash

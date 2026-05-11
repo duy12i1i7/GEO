@@ -73,6 +73,8 @@ Repo vẫn có bootstrap riêng nếu muốn chuẩn bị môi trường trướ
 
 - [scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh](/Users/udy/GEO-repo/scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh)
 
+Trên Ubuntu 24.04, bootstrap này mặc định dùng `python3` của hệ thống.
+
 Luồng khuyến nghị:
 
 ```bash
