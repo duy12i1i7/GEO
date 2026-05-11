@@ -91,6 +91,31 @@ TORCH_INDEX_URL=https://download.pytorch.org/whl/cu121 \
 
 Trên Ubuntu 24.04, script này mặc định dùng `python3` của hệ thống, tức thường là Python 3.12.
 
+Nếu mục tiêu chỉ là `POC` ý tưởng trên máy Ubuntu + NVIDIA tầm trung, nên dùng script cân bằng sau thay vì `full`:
+
+```bash
+cd ~/GEO
+git pull
+./scripts/run_poc_balanced_ubuntu_nvidia.sh
+```
+
+Script này sẽ:
+- tự bootstrap nếu môi trường chưa có
+- mặc định bỏ `OpenMVS` để tránh build quá nặng
+- chạy benchmark `2 dataset thật`:
+  - `ODMData mygla`
+  - `Dronescapes test_set_annotated_only`
+- so sánh:
+  - `DUSt3R`
+  - `MASt3R`
+  - `risk_hybrid`
+
+Các biến có thể override khi cần:
+
+```bash
+THERMAL_SAFE=1 BUILD_JOBS=2 DRONESCAPES_MAX_FRAMES=16 ./scripts/run_poc_balanced_ubuntu_nvidia.sh
+```
+
 Nếu máy dễ sập vì nhiệt nhưng vẫn muốn chạy `full`, dùng thermal-safe mode:
 
 ```bash
