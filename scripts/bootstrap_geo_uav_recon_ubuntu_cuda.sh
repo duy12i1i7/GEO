@@ -66,8 +66,15 @@ build_openmvs() {
   local openmvs_dir="$ROOT_DIR/.external/openMVS"
   local openmvs_build="$ROOT_DIR/.external/openMVS_build"
   local vcpkg_triplet="x64-linux"
+  local openmvs_use_cuda="OFF"
   if [[ "$(uname -m)" == "aarch64" || "$(uname -m)" == "arm64" ]]; then
     vcpkg_triplet="arm64-linux"
+  fi
+  if command -v nvcc >/dev/null 2>&1; then
+    openmvs_use_cuda="ON"
+    log "nvcc detected; enabling CUDA dependency feature for OpenMVS"
+  else
+    log "nvcc not found; OpenMVS will be built without CUDA acceleration"
   fi
   clone_or_update_repo "https://github.com/cdcseacave/openMVS.git" "$openmvs_dir"
   clone_or_update_repo "https://github.com/microsoft/vcpkg.git" "$VCPKG_ROOT"
@@ -75,6 +82,17 @@ build_openmvs() {
     log "bootstrapping vcpkg"
     VCPKG_DISABLE_METRICS=1 "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
   fi
+  log "installing OpenMVS manifest dependencies with vcpkg"
+  VCPKG_INSTALL_ARGS=(
+    "$VCPKG_ROOT/vcpkg"
+    install
+    "--x-manifest-root=$openmvs_dir"
+    "--triplet=$vcpkg_triplet"
+  )
+  if [[ "$openmvs_use_cuda" == "ON" ]]; then
+    VCPKG_INSTALL_ARGS+=("--x-feature=cuda")
+  fi
+  VCPKG_DISABLE_METRICS=1 "${VCPKG_INSTALL_ARGS[@]}"
   log "configuring OpenMVS with CUDA"
   VCPKG_ROOT="$VCPKG_ROOT" VCPKG_DISABLE_METRICS=1 cmake \
     -S "$openmvs_dir" \
@@ -83,9 +101,11 @@ build_openmvs() {
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
     -DVCPKG_TARGET_TRIPLET="$vcpkg_triplet" \
+    -DVCPKG_MANIFEST_MODE=ON \
+    -DVCPKG_MANIFEST_DIR="$openmvs_dir" \
     -DOpenMVS_BUILD_VIEWER=OFF \
     -DOpenMVS_ENABLE_TESTS=OFF \
-    -DOpenMVS_USE_CUDA=ON \
+    -DOpenMVS_USE_CUDA="$openmvs_use_cuda" \
     -DOpenMVS_USE_PYTHON=OFF \
     -DOpenMVS_USE_SIFTGPU=OFF
   log "building OpenMVS"
