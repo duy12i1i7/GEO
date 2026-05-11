@@ -65,10 +65,13 @@ install_apt_deps() {
 build_openmvs() {
   local openmvs_dir="$ROOT_DIR/.external/openMVS"
   local openmvs_build="$ROOT_DIR/.external/openMVS_build"
-  local vcpkg_triplet="x64-linux"
+  local vcpkg_triplet="x64-linux-geo-release"
+  local overlay_triplets_dir="$ROOT_DIR/.external/vcpkg_triplets"
+  local triplet_path="$overlay_triplets_dir/$vcpkg_triplet.cmake"
   local openmvs_use_cuda="OFF"
   if [[ "$(uname -m)" == "aarch64" || "$(uname -m)" == "arm64" ]]; then
-    vcpkg_triplet="arm64-linux"
+    vcpkg_triplet="arm64-linux-geo-release"
+    triplet_path="$overlay_triplets_dir/$vcpkg_triplet.cmake"
   fi
   if command -v nvcc >/dev/null 2>&1; then
     openmvs_use_cuda="ON"
@@ -82,11 +85,36 @@ build_openmvs() {
     log "bootstrapping vcpkg"
     VCPKG_DISABLE_METRICS=1 "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
   fi
+  mkdir -p "$overlay_triplets_dir"
+  if [[ "$(uname -m)" == "aarch64" || "$(uname -m)" == "arm64" ]]; then
+    cat >"$triplet_path" <<'EOF'
+set(VCPKG_TARGET_ARCHITECTURE arm64)
+set(VCPKG_CMAKE_SYSTEM_NAME Linux)
+set(VCPKG_LIBRARY_LINKAGE static)
+set(VCPKG_BUILD_TYPE release)
+set(VCPKG_C_FLAGS "-mfma")
+set(VCPKG_CXX_FLAGS "-mfma")
+set(VCPKG_C_FLAGS_RELEASE "-mfma")
+set(VCPKG_CXX_FLAGS_RELEASE "-mfma")
+EOF
+  else
+    cat >"$triplet_path" <<'EOF'
+set(VCPKG_TARGET_ARCHITECTURE x64)
+set(VCPKG_CMAKE_SYSTEM_NAME Linux)
+set(VCPKG_LIBRARY_LINKAGE static)
+set(VCPKG_BUILD_TYPE release)
+set(VCPKG_C_FLAGS "-mfma")
+set(VCPKG_CXX_FLAGS "-mfma")
+set(VCPKG_C_FLAGS_RELEASE "-mfma")
+set(VCPKG_CXX_FLAGS_RELEASE "-mfma")
+EOF
+  fi
   log "installing OpenMVS manifest dependencies with vcpkg"
   VCPKG_INSTALL_ARGS=(
     "$VCPKG_ROOT/vcpkg"
     install
     "--x-manifest-root=$openmvs_dir"
+    "--overlay-triplets=$overlay_triplets_dir"
     "--triplet=$vcpkg_triplet"
   )
   if [[ "$openmvs_use_cuda" == "ON" ]]; then
@@ -100,6 +128,7 @@ build_openmvs() {
     -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+    -DVCPKG_OVERLAY_TRIPLETS="$overlay_triplets_dir" \
     -DVCPKG_TARGET_TRIPLET="$vcpkg_triplet" \
     -DVCPKG_MANIFEST_MODE=ON \
     -DVCPKG_MANIFEST_DIR="$openmvs_dir" \
