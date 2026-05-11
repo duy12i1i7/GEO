@@ -5,16 +5,19 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_ROOT="$ROOT_DIR/data/geo_uav_recon"
 OUTPUT_ROOT="$ROOT_DIR/output/geo_uav_recon"
 MODE="full"
-ODM_ROOT=""
+ODM_ROOTS=()
 ODM_OUTPUT_ROOT=""
 ODM_SAMPLE_NAME="mygla"
+ODM_BENCHMARK_SUITE=""
 ODM_ARCHIVE_PATH=""
 ODM_SOURCE_URL=""
 ODM_DOWNLOAD_DIR=""
 DRONESCAPES_ROOT=""
+DRONESCAPES_OUTPUT_ROOT=""
 DRONESCAPES_SOURCE_ROOT=""
 DRONESCAPES_REPO_ID="Meehai/dronescapes"
 DRONESCAPES_SPLIT="test_set_annotated_only"
+DRONESCAPES_BENCHMARK_SUITE=""
 DRONESCAPES_RGB_MODALITY="rgb"
 DRONESCAPES_DEPTH_MODALITY="depth_sfm_manual202204"
 PYTHON_BIN=""
@@ -42,20 +45,23 @@ One-command entrypoint for the GEO UAV reconstruction project.
 
 Modes:
   quick   Uses a compact Dronescapes subset and runs the benchmark.
-  full    Default. Runs the real benchmark with ODMData + the full selected Dronescapes split.
+  full    Default. Runs the real benchmark with the ODMData suite and all Dronescapes splits unless overridden.
 
 Options:
   --mode <quick|full>
-  --odm-root <path>
+  --odm-root <path>                    Repeatable
   --odm-output-root <path>
   --odm-sample-name <name>
+  --odm-benchmark-suite <name|csv>
   --odm-archive-path <path>
   --odm-source-url <url>
   --odm-download-dir <path>
   --dronescapes-root <path>
+  --dronescapes-output-root <path>
   --dronescapes-source-root <path>
   --dronescapes-repo-id <repo>
   --dronescapes-split <name>
+  --dronescapes-benchmark-suite <name|csv>
   --dronescapes-rgb-modality <name>
   --dronescapes-depth-modality <name>
   --python-bin <path>
@@ -80,16 +86,19 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --mode) MODE="$2"; shift 2 ;;
-    --odm-root) ODM_ROOT="$2"; shift 2 ;;
+    --odm-root) ODM_ROOTS+=("$2"); shift 2 ;;
     --odm-output-root) ODM_OUTPUT_ROOT="$2"; shift 2 ;;
     --odm-sample-name) ODM_SAMPLE_NAME="$2"; shift 2 ;;
+    --odm-benchmark-suite) ODM_BENCHMARK_SUITE="$2"; shift 2 ;;
     --odm-archive-path) ODM_ARCHIVE_PATH="$2"; shift 2 ;;
     --odm-source-url) ODM_SOURCE_URL="$2"; shift 2 ;;
     --odm-download-dir) ODM_DOWNLOAD_DIR="$2"; shift 2 ;;
     --dronescapes-root) DRONESCAPES_ROOT="$2"; shift 2 ;;
+    --dronescapes-output-root) DRONESCAPES_OUTPUT_ROOT="$2"; shift 2 ;;
     --dronescapes-source-root) DRONESCAPES_SOURCE_ROOT="$2"; shift 2 ;;
     --dronescapes-repo-id) DRONESCAPES_REPO_ID="$2"; shift 2 ;;
     --dronescapes-split) DRONESCAPES_SPLIT="$2"; shift 2 ;;
+    --dronescapes-benchmark-suite) DRONESCAPES_BENCHMARK_SUITE="$2"; shift 2 ;;
     --dronescapes-rgb-modality) DRONESCAPES_RGB_MODALITY="$2"; shift 2 ;;
     --dronescapes-depth-modality) DRONESCAPES_DEPTH_MODALITY="$2"; shift 2 ;;
     --python-bin) PYTHON_BIN="$2"; shift 2 ;;
@@ -121,6 +130,16 @@ if [[ "$MODE" != "quick" && "$MODE" != "full" ]]; then
   exit 2
 fi
 
+if [[ ${#ODM_ROOTS[@]} -gt 0 && -n "$ODM_BENCHMARK_SUITE" ]]; then
+  printf 'Use either repeated --odm-root or --odm-benchmark-suite, not both.\n' >&2
+  exit 2
+fi
+
+if [[ -n "$DRONESCAPES_ROOT" && -n "$DRONESCAPES_BENCHMARK_SUITE" ]]; then
+  printf 'Use either --dronescapes-root or --dronescapes-benchmark-suite, not both.\n' >&2
+  exit 2
+fi
+
 if [[ -z "$PYTHON_BIN" ]]; then
   if [[ -x "$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python" ]]; then
     PYTHON_BIN="$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python"
@@ -135,7 +154,7 @@ if [[ ! -x "$PYTHON_BIN" && "$PYTHON_BIN" != "python3" ]]; then
 fi
 
 if [[ ! -x "$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python" && "$AUTO_BOOTSTRAP" == "1" ]]; then
-  if [[ "$MODE" == "full" || -n "$ODM_ROOT" || -n "$ODM_OUTPUT_ROOT" ]]; then
+  if [[ "$MODE" == "full" || ${#ODM_ROOTS[@]} -gt 0 || -n "$ODM_OUTPUT_ROOT" || -n "$ODM_BENCHMARK_SUITE" ]]; then
     WITH_OPENMVS=1 "$ROOT_DIR/scripts/bootstrap_geo_uav_recon_full.sh"
   else
     WITH_OPENMVS=0 "$ROOT_DIR/scripts/bootstrap_geo_uav_recon_full.sh"
@@ -143,8 +162,22 @@ if [[ ! -x "$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python" && "$AUTO_
   PYTHON_BIN="$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python"
 fi
 
-if [[ -z "$ODM_ROOT" && -z "$ODM_OUTPUT_ROOT" && "$MODE" == "full" ]]; then
-  ODM_OUTPUT_ROOT="$DATA_ROOT/odmdata_${ODM_SAMPLE_NAME}"
+if [[ "$MODE" == "full" ]]; then
+  if [[ ${#ODM_ROOTS[@]} -eq 0 && -z "$ODM_OUTPUT_ROOT" && -z "$ODM_BENCHMARK_SUITE" ]]; then
+    ODM_BENCHMARK_SUITE="recommended"
+  fi
+  if [[ -z "$DRONESCAPES_ROOT" && -z "$DRONESCAPES_OUTPUT_ROOT" && -z "$DRONESCAPES_BENCHMARK_SUITE" ]]; then
+    DRONESCAPES_BENCHMARK_SUITE="all_splits"
+  fi
+fi
+
+if [[ ${#ODM_ROOTS[@]} -eq 0 && -z "$ODM_OUTPUT_ROOT" && "$MODE" == "full" ]]; then
+  if [[ -n "$ODM_BENCHMARK_SUITE" ]]; then
+    SUITE_SLUG="$(printf '%s' "$ODM_BENCHMARK_SUITE" | tr ',/' '__' | tr -cs '[:alnum:]_-' '_')"
+    ODM_OUTPUT_ROOT="$DATA_ROOT/odm_suite_${SUITE_SLUG}"
+  else
+    ODM_OUTPUT_ROOT="$DATA_ROOT/odmdata_${ODM_SAMPLE_NAME}"
+  fi
 fi
 
 if [[ "$AUTO_BOOTSTRAP" == "1" && "$MODE" == "full" ]]; then
@@ -159,9 +192,13 @@ if [[ "$RUN_TESTS" == "1" ]]; then
     "$PYTHON_BIN" -m unittest discover -s "$ROOT_DIR/src/geo_uav_recon/test" -v >/dev/null
 fi
 
-if [[ -z "$DRONESCAPES_ROOT" ]]; then
+if [[ -z "$DRONESCAPES_ROOT" && -z "$DRONESCAPES_OUTPUT_ROOT" ]]; then
   if [[ "$MODE" == "full" ]]; then
-    DRONESCAPES_ROOT="$DATA_ROOT/dronescapes_full_${DRONESCAPES_SPLIT}"
+    if [[ -n "$DRONESCAPES_BENCHMARK_SUITE" ]]; then
+      DRONESCAPES_OUTPUT_ROOT="$DATA_ROOT/dronescapes_suite_${DRONESCAPES_BENCHMARK_SUITE}"
+    else
+      DRONESCAPES_ROOT="$DATA_ROOT/dronescapes_full_${DRONESCAPES_SPLIT}"
+    fi
   else
     DRONESCAPES_ROOT="$DATA_ROOT/dronescapes_ready_subset"
   fi
@@ -176,9 +213,7 @@ fi
 
 REAL_ARGS=(
   "$ROOT_DIR/scripts/run_real_uav_benchmark.sh"
-  --dronescapes-root "$DRONESCAPES_ROOT"
   --dronescapes-repo-id "$DRONESCAPES_REPO_ID"
-  --dronescapes-split "$DRONESCAPES_SPLIT"
   --dronescapes-rgb-modality "$DRONESCAPES_RGB_MODALITY"
   --dronescapes-depth-modality "$DRONESCAPES_DEPTH_MODALITY"
   --output-dir "$OUTPUT_DIR"
@@ -192,27 +227,43 @@ REAL_ARGS=(
   --refine-image-size "$REFINE_IMAGE_SIZE"
   --window-size "$WINDOW_SIZE"
   --batch-size "$BATCH_SIZE"
+  --dronescapes-max-frames "$DRONESCAPES_MAX_FRAMES"
+  --dronescapes-start-index "$DRONESCAPES_START_INDEX"
 )
 
+if [[ -n "$DRONESCAPES_BENCHMARK_SUITE" ]]; then
+  REAL_ARGS+=(--dronescapes-output-root "$DRONESCAPES_OUTPUT_ROOT" --dronescapes-benchmark-suite "$DRONESCAPES_BENCHMARK_SUITE")
+else
+  REAL_ARGS+=(--dronescapes-root "$DRONESCAPES_ROOT" --dronescapes-split "$DRONESCAPES_SPLIT")
+fi
+for prefix in "${DRONESCAPES_SCENE_PREFIXES[@]}"; do
+  [[ -n "$prefix" ]] && REAL_ARGS+=(--dronescapes-scene-prefix "$prefix")
+done
+
 if [[ "$MODE" == "full" ]]; then
-  if [[ -n "$ODM_ROOT" ]]; then
-    REAL_ARGS+=(--odm-root "$ODM_ROOT")
+  if [[ ${#ODM_ROOTS[@]} -gt 0 ]]; then
+    for odm_root in "${ODM_ROOTS[@]}"; do
+      REAL_ARGS+=(--odm-root "$odm_root")
+    done
   else
-    REAL_ARGS+=(--odm-output-root "$ODM_OUTPUT_ROOT" --odm-sample-name "$ODM_SAMPLE_NAME")
-    [[ -n "$ODM_ARCHIVE_PATH" ]] && REAL_ARGS+=(--odm-archive-path "$ODM_ARCHIVE_PATH")
-    [[ -n "$ODM_SOURCE_URL" ]] && REAL_ARGS+=(--odm-source-url "$ODM_SOURCE_URL")
+    REAL_ARGS+=(--odm-output-root "$ODM_OUTPUT_ROOT")
+    if [[ -n "$ODM_BENCHMARK_SUITE" ]]; then
+      REAL_ARGS+=(--odm-benchmark-suite "$ODM_BENCHMARK_SUITE")
+    else
+      REAL_ARGS+=(--odm-sample-name "$ODM_SAMPLE_NAME")
+      [[ -n "$ODM_ARCHIVE_PATH" ]] && REAL_ARGS+=(--odm-archive-path "$ODM_ARCHIVE_PATH")
+      [[ -n "$ODM_SOURCE_URL" ]] && REAL_ARGS+=(--odm-source-url "$ODM_SOURCE_URL")
+    fi
     [[ -n "$ODM_DOWNLOAD_DIR" ]] && REAL_ARGS+=(--odm-download-dir "$ODM_DOWNLOAD_DIR")
   fi
 else
   REAL_ARGS+=(--skip-colmap-openmvs)
 fi
 
-if [[ ! -d "$DRONESCAPES_ROOT" ]]; then
+if [[ -n "$DRONESCAPES_BENCHMARK_SUITE" || ! -d "$DRONESCAPES_ROOT" ]]; then
   REAL_ARGS=(
     "$ROOT_DIR/scripts/run_real_uav_benchmark.sh"
-    --dronescapes-output-root "$DRONESCAPES_ROOT"
     --dronescapes-repo-id "$DRONESCAPES_REPO_ID"
-    --dronescapes-split "$DRONESCAPES_SPLIT"
     --dronescapes-rgb-modality "$DRONESCAPES_RGB_MODALITY"
     --dronescapes-depth-modality "$DRONESCAPES_DEPTH_MODALITY"
     --output-dir "$OUTPUT_DIR"
@@ -229,6 +280,16 @@ if [[ ! -d "$DRONESCAPES_ROOT" ]]; then
     --dronescapes-max-frames "$DRONESCAPES_MAX_FRAMES"
     --dronescapes-start-index "$DRONESCAPES_START_INDEX"
   )
+  if [[ -n "$DRONESCAPES_BENCHMARK_SUITE" ]]; then
+    REAL_ARGS+=(--dronescapes-output-root "$DRONESCAPES_OUTPUT_ROOT" --dronescapes-benchmark-suite "$DRONESCAPES_BENCHMARK_SUITE")
+  else
+    REAL_ARGS+=(
+      --dronescapes-output-root "$DRONESCAPES_ROOT"
+      --dronescapes-split "$DRONESCAPES_SPLIT"
+      --dronescapes-max-frames "$DRONESCAPES_MAX_FRAMES"
+      --dronescapes-start-index "$DRONESCAPES_START_INDEX"
+    )
+  fi
   if [[ -n "$DRONESCAPES_SOURCE_ROOT" ]]; then
     REAL_ARGS+=(--dronescapes-source-root "$DRONESCAPES_SOURCE_ROOT")
   fi
@@ -236,12 +297,19 @@ if [[ ! -d "$DRONESCAPES_ROOT" ]]; then
     [[ -n "$prefix" ]] && REAL_ARGS+=(--dronescapes-scene-prefix "$prefix")
   done
   if [[ "$MODE" == "full" ]]; then
-    if [[ -n "$ODM_ROOT" ]]; then
-      REAL_ARGS+=(--odm-root "$ODM_ROOT")
+    if [[ ${#ODM_ROOTS[@]} -gt 0 ]]; then
+      for odm_root in "${ODM_ROOTS[@]}"; do
+        REAL_ARGS+=(--odm-root "$odm_root")
+      done
     else
-      REAL_ARGS+=(--odm-output-root "$ODM_OUTPUT_ROOT" --odm-sample-name "$ODM_SAMPLE_NAME")
-      [[ -n "$ODM_ARCHIVE_PATH" ]] && REAL_ARGS+=(--odm-archive-path "$ODM_ARCHIVE_PATH")
-      [[ -n "$ODM_SOURCE_URL" ]] && REAL_ARGS+=(--odm-source-url "$ODM_SOURCE_URL")
+      REAL_ARGS+=(--odm-output-root "$ODM_OUTPUT_ROOT")
+      if [[ -n "$ODM_BENCHMARK_SUITE" ]]; then
+        REAL_ARGS+=(--odm-benchmark-suite "$ODM_BENCHMARK_SUITE")
+      else
+        REAL_ARGS+=(--odm-sample-name "$ODM_SAMPLE_NAME")
+        [[ -n "$ODM_ARCHIVE_PATH" ]] && REAL_ARGS+=(--odm-archive-path "$ODM_ARCHIVE_PATH")
+        [[ -n "$ODM_SOURCE_URL" ]] && REAL_ARGS+=(--odm-source-url "$ODM_SOURCE_URL")
+      fi
       [[ -n "$ODM_DOWNLOAD_DIR" ]] && REAL_ARGS+=(--odm-download-dir "$ODM_DOWNLOAD_DIR")
     fi
   else

@@ -7,7 +7,13 @@ from pathlib import Path
 from .benchmark import export_colmap_openmvs, merge_depths, run_benchmark, write_real_benchmark_config
 from .dataset import summarize_dataset, validate_dataset_root
 from .predictors import export_model_depths
-from .realdata import describe_odm_sources, export_dronescapes_subset, prepare_odm_dataset
+from .realdata import (
+    describe_odm_sources,
+    export_dronescapes_subset,
+    prepare_odm_dataset,
+    resolve_dronescapes_benchmark_suite,
+    resolve_odm_benchmark_suite,
+)
 from .risk import select_frames
 
 
@@ -23,6 +29,12 @@ def _parser() -> argparse.ArgumentParser:
     prepare_odm.add_argument("--archive-path")
     prepare_odm.add_argument("--source-url")
     prepare_odm.add_argument("--download-dir")
+
+    odm_suite = sub.add_parser("resolve-odm-suite")
+    odm_suite.add_argument("--suite", required=True)
+
+    dr_suite = sub.add_parser("resolve-dronescapes-suite")
+    dr_suite.add_argument("--suite", required=True)
 
     dr_subset = sub.add_parser("dronescapes-subset")
     dr_subset.add_argument("--output-dir", required=True)
@@ -51,8 +63,8 @@ def _parser() -> argparse.ArgumentParser:
     write_cfg.add_argument("--refine-device", default="cpu")
     write_cfg.add_argument("--window-size", type=int, default=2)
     write_cfg.add_argument("--batch-size", type=int, default=1)
-    write_cfg.add_argument("--odm-root")
-    write_cfg.add_argument("--dronescapes-root")
+    write_cfg.add_argument("--odm-root", action="append", default=[])
+    write_cfg.add_argument("--dronescapes-root", action="append", default=[])
     write_cfg.add_argument("--colmap-bin")
     write_cfg.add_argument("--openmvs-bin-dir")
     write_cfg.add_argument("--skip-colmap-openmvs", action="store_true")
@@ -118,6 +130,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "prepare-odm":
         print(json.dumps(prepare_odm_dataset(args.output_dir, args.sample_name, args.archive_path, args.source_url, args.download_dir), indent=2))
         return 0
+    if args.command == "resolve-odm-suite":
+        print(json.dumps({"suite": args.suite, "samples": resolve_odm_benchmark_suite(args.suite)}, indent=2))
+        return 0
+    if args.command == "resolve-dronescapes-suite":
+        print(json.dumps({"suite": args.suite, "splits": resolve_dronescapes_benchmark_suite(args.suite)}, indent=2))
+        return 0
     if args.command == "dronescapes-subset":
         print(json.dumps(export_dronescapes_subset(args.output_dir, args.repo_id, args.split, args.rgb_modality, args.depth_modality, args.scene_prefix, args.max_frames, args.start_index, args.local_root), indent=2))
         return 0
@@ -137,8 +155,8 @@ def main(argv: list[str] | None = None) -> int:
             refine_device=args.refine_device,
             window_size=args.window_size,
             batch_size=args.batch_size,
-            odm_root=args.odm_root,
-            dronescapes_root=args.dronescapes_root,
+            odm_roots=args.odm_root,
+            dronescapes_roots=args.dronescapes_root,
             colmap_bin=args.colmap_bin,
             openmvs_bin_dir=args.openmvs_bin_dir,
             skip_colmap_openmvs=args.skip_colmap_openmvs,

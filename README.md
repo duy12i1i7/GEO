@@ -34,8 +34,8 @@ Lệnh chính:
 Lệnh này sẽ:
 
 - bootstrap môi trường nếu chưa có
-- tự tải `ODMData` sample đã chọn
-- tự tải full split `Dronescapes` đã chọn trong chế độ `full`
+- trong `full`, tự chạy suite `ODMData` mặc định `recommended`
+- trong `full`, tự tải và benchmark toàn bộ các split `Dronescapes` mặc định `all_splits`
 - chạy self-check
 - chạy benchmark end-to-end
 - xuất report HTML, JSON, CSV
@@ -57,6 +57,39 @@ Ví dụ chạy lớn hơn trên máy mạnh:
   --risk-neighbors 8 \
   --dronescapes-max-frames 0
 ```
+
+Mặc định `full` giờ tương đương với:
+
+```bash
+/Users/udy/GEO-repo/run_geo_project.sh \
+  --odm-benchmark-suite recommended \
+  --dronescapes-benchmark-suite all_splits
+```
+
+Chạy một suite nhiều block `ODMData` trong cùng một lần benchmark:
+
+```bash
+/Users/udy/GEO-repo/run_geo_project.sh \
+  --odm-benchmark-suite recommended
+```
+
+Preset `recommended` hiện gồm:
+
+- `mygla`
+- `toledo`
+- `shitan_tw` (chấp nhận alias `shitan`)
+- `tuniu_tw_1`
+
+Preset `all_splits` của `Dronescapes` hiện gồm:
+
+- `train_set`
+- `validation_set`
+- `semisupervised_set`
+- `test_set`
+- `train_set_annotated_only`
+- `validation_set_annotated_only`
+- `semisupervised_set_annotated_only`
+- `test_set_annotated_only`
 
 ## Dataset và output
 

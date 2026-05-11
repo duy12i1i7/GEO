@@ -7,7 +7,7 @@ import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -432,7 +432,9 @@ def write_real_benchmark_config(
     window_size: int,
     batch_size: int,
     odm_root: str | None = None,
+    odm_roots: Sequence[str] | None = None,
     dronescapes_root: str | None = None,
+    dronescapes_roots: Sequence[str] | None = None,
     colmap_bin: str | None = None,
     openmvs_bin_dir: str | None = None,
     skip_colmap_openmvs: bool = False,
@@ -440,10 +442,39 @@ def write_real_benchmark_config(
 ) -> dict:
     root = Path(root_dir or Path(__file__).resolve().parents[3])
     datasets = []
+    resolved_odm_roots: list[str] = []
+    if odm_roots:
+        resolved_odm_roots.extend(str(path) for path in odm_roots if str(path).strip())
     if odm_root:
-        datasets.append({"name": "odmdata_real", "kind": "odmdata", "root": odm_root})
+        resolved_odm_roots.append(odm_root)
+    seen_odm_roots: set[str] = set()
+    for root_path in resolved_odm_roots:
+        if root_path in seen_odm_roots:
+            continue
+        seen_odm_roots.add(root_path)
+        sample_name = Path(root_path).name
+        if sample_name.startswith("odmdata_"):
+            sample_name = sample_name[len("odmdata_") :]
+        safe_sample_name = "".join(char if char.isalnum() or char in {"_", "-"} else "_" for char in sample_name)
+        datasets.append({"name": f"odmdata_{safe_sample_name}_real", "kind": "odmdata", "root": root_path})
+    resolved_dronescapes_roots: list[str] = []
+    if dronescapes_roots:
+        resolved_dronescapes_roots.extend(str(path) for path in dronescapes_roots if str(path).strip())
     if dronescapes_root:
-        datasets.append({"name": "dronescapes_real", "kind": "dronescapes", "root": dronescapes_root})
+        resolved_dronescapes_roots.append(dronescapes_root)
+    seen_dronescapes_roots: set[str] = set()
+    for root_path in resolved_dronescapes_roots:
+        if root_path in seen_dronescapes_roots:
+            continue
+        seen_dronescapes_roots.add(root_path)
+        split_name = Path(root_path).name
+        if split_name.startswith("dronescapes_full_"):
+            split_name = split_name[len("dronescapes_full_") :]
+        elif split_name.startswith("dronescapes_"):
+            split_name = split_name[len("dronescapes_") :]
+        safe_split_name = "".join(char if char.isalnum() or char in {"_", "-"} else "_" for char in split_name)
+        dataset_name = "dronescapes_real" if safe_split_name == "test_set_annotated_only" and len(resolved_dronescapes_roots) == 1 else f"dronescapes_{safe_split_name}_real"
+        datasets.append({"name": dataset_name, "kind": "dronescapes", "root": root_path})
     methods = []
     if not skip_colmap_openmvs:
         methods.append(

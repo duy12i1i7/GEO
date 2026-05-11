@@ -9,10 +9,40 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from geo_uav_recon.realdata import export_dronescapes_subset, prepare_odm_dataset
+from geo_uav_recon.realdata import (
+    export_dronescapes_subset,
+    prepare_odm_dataset,
+    resolve_dronescapes_benchmark_suite,
+    resolve_odm_benchmark_suite,
+)
 
 
 class TestRealDataHelpers(unittest.TestCase):
+    def test_resolve_odm_benchmark_suite_alias_and_preset(self) -> None:
+        self.assertEqual(
+            resolve_odm_benchmark_suite("recommended"),
+            ["mygla", "toledo", "shitan_tw", "tuniu_tw_1"],
+        )
+        self.assertEqual(
+            resolve_odm_benchmark_suite("mygla,toledo,shitan,tuniu_tw_1"),
+            ["mygla", "toledo", "shitan_tw", "tuniu_tw_1"],
+        )
+
+    def test_resolve_dronescapes_benchmark_suite(self) -> None:
+        self.assertEqual(
+            resolve_dronescapes_benchmark_suite("annotated_only"),
+            [
+                "train_set_annotated_only",
+                "validation_set_annotated_only",
+                "semisupervised_set_annotated_only",
+                "test_set_annotated_only",
+            ],
+        )
+        self.assertEqual(
+            resolve_dronescapes_benchmark_suite("test_set,validation_set"),
+            ["test_set", "validation_set"],
+        )
+
     def test_prepare_odm_dataset_from_archive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

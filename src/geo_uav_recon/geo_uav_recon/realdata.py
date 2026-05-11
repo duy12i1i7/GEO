@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tempfile
 import zipfile
 from pathlib import Path
 from typing import Sequence
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from huggingface_hub import hf_hub_download, list_repo_files
 import requests
@@ -17,7 +18,37 @@ from .dataset import summarize_dataset, validate_dataset_root
 ODM_SAMPLE_SOURCES = {
     "mygla": "https://github.com/merkato/odm_mygla_dataset/archive/refs/heads/master.zip",
     "toledo": "https://github.com/OpenDroneMap/odm_data_toledo/archive/refs/heads/master.zip",
+    "shitan_tw": "https://drive.google.com/open?id=1Spu1F713Tw-z1XMdnrlD6NT4EhhFy2Lj",
+    "tuniu_tw_1": "https://drive.google.com/open?id=1faBtGK7Jm5lTo_UWLz6onDGYGqlykHPa",
     "waterbury": "https://github.com/OpenDroneMap/odm_data_waterbury/archive/refs/heads/master.zip",
+}
+
+ODM_SAMPLE_ALIASES = {
+    "shitan": "shitan_tw",
+}
+
+ODM_BENCHMARK_SUITES = {
+    "recommended": ["mygla", "toledo", "shitan_tw", "tuniu_tw_1"],
+    "starter_plus_rtk": ["mygla", "toledo", "tuniu_tw_1"],
+}
+
+DRONESCAPES_BENCHMARK_SUITES = {
+    "annotated_only": [
+        "train_set_annotated_only",
+        "validation_set_annotated_only",
+        "semisupervised_set_annotated_only",
+        "test_set_annotated_only",
+    ],
+    "all_splits": [
+        "train_set",
+        "validation_set",
+        "semisupervised_set",
+        "test_set",
+        "train_set_annotated_only",
+        "validation_set_annotated_only",
+        "semisupervised_set_annotated_only",
+        "test_set_annotated_only",
+    ],
 }
 
 
@@ -34,10 +65,52 @@ def _is_valid_dataset(dataset_kind: str, dataset_root: Path) -> bool:
 
 
 def describe_odm_sources() -> dict:
-    return {"samples": ODM_SAMPLE_SOURCES}
+    return {
+        "samples": ODM_SAMPLE_SOURCES,
+        "aliases": ODM_SAMPLE_ALIASES,
+        "suites": ODM_BENCHMARK_SUITES,
+        "dronescapes_suites": DRONESCAPES_BENCHMARK_SUITES,
+    }
+
+
+def normalize_odm_sample_name(sample_name: str) -> str:
+    normalized = sample_name.strip().lower()
+    return ODM_SAMPLE_ALIASES.get(normalized, normalized)
+
+
+def resolve_odm_benchmark_suite(suite_name: str | Sequence[str]) -> list[str]:
+    if isinstance(suite_name, str):
+        requested = suite_name.strip().lower()
+        if not requested:
+            return []
+        if requested in ODM_BENCHMARK_SUITES:
+            names = ODM_BENCHMARK_SUITES[requested]
+        else:
+            names = [part.strip() for part in requested.split(",") if part.strip()]
+    else:
+        names = [str(part).strip() for part in suite_name if str(part).strip()]
+
+    resolved = [normalize_odm_sample_name(name) for name in names]
+    unknown = [name for name in resolved if name not in ODM_SAMPLE_SOURCES]
+    if unknown:
+        raise RuntimeError(f"Unknown ODMData sample(s): {', '.join(sorted(set(unknown)))}")
+    return resolved
+
+
+def resolve_dronescapes_benchmark_suite(suite_name: str | Sequence[str]) -> list[str]:
+    if isinstance(suite_name, str):
+        requested = suite_name.strip().lower()
+        if not requested:
+            return []
+        if requested in DRONESCAPES_BENCHMARK_SUITES:
+            return list(DRONESCAPES_BENCHMARK_SUITES[requested])
+        return [part.strip() for part in requested.split(",") if part.strip()]
+    return [str(part).strip() for part in suite_name if str(part).strip()]
 
 
 def _download(url: str, destination: Path) -> Path:
+    if "drive.google.com" in url:
+        return _download_google_drive(url, destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with requests.get(url, stream=True, timeout=180) as response:
         response.raise_for_status()
@@ -45,6 +118,65 @@ def _download(url: str, destination: Path) -> Path:
             for chunk in response.iter_content(chunk_size=1024 * 1024):
                 if chunk:
                     handle.write(chunk)
+    return destination
+
+
+def _extract_drive_file_id(url: str) -> str | None:
+    parsed = urlparse(url)
+    if "drive.google.com" not in parsed.netloc:
+        return None
+    query_id = parse_qs(parsed.query).get("id")
+    if query_id:
+        return query_id[0]
+    match = re.search(r"/d/([^/]+)", parsed.path)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _drive_confirm_token(response: requests.Response) -> str | None:
+    for key, value in response.cookies.items():
+        if key.startswith("download_warning"):
+            return value
+    content_type = response.headers.get("content-type", "").lower()
+    if "text/html" not in content_type:
+        return None
+    text = response.text
+    match = re.search(r"confirm=([0-9A-Za-z_]+)", text)
+    if match:
+        return match.group(1)
+    match = re.search(r'name="confirm"\s+value="([^"]+)"', text)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _download_google_drive(url: str, destination: Path) -> Path:
+    file_id = _extract_drive_file_id(url)
+    if not file_id:
+        raise RuntimeError(f"Could not extract Google Drive file id from {url}")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    base_url = "https://drive.google.com/uc"
+    session = requests.Session()
+    params = {"export": "download", "id": file_id}
+    response = session.get(base_url, params=params, stream=True, timeout=180)
+    token = _drive_confirm_token(response)
+    if token:
+        response.close()
+        params["confirm"] = token
+        response = session.get(base_url, params=params, stream=True, timeout=180)
+    response.raise_for_status()
+    content_type = response.headers.get("content-type", "").lower()
+    if "text/html" in content_type:
+        preview = response.text[:400]
+        response.close()
+        raise RuntimeError(f"Google Drive did not return a downloadable archive for {url}. Response preview: {preview}")
+    with destination.open("wb") as handle:
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            if chunk:
+                handle.write(chunk)
+    response.close()
     return destination
 
 
@@ -63,7 +195,8 @@ def prepare_odm_dataset(
 ) -> dict:
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    chosen_url = source_url or ODM_SAMPLE_SOURCES.get(sample_name)
+    resolved_sample_name = normalize_odm_sample_name(sample_name)
+    chosen_url = source_url or ODM_SAMPLE_SOURCES.get(resolved_sample_name)
     archive_candidate = Path(archive_path).expanduser() if archive_path else None
 
     if not _is_valid_dataset("odmdata", output_path):
@@ -98,7 +231,7 @@ def prepare_odm_dataset(
         "summary": summary,
         "checks": validate_dataset_root("odmdata", str(output_path))["checks"],
         "prepared": False,
-        "sample_name": sample_name,
+        "sample_name": resolved_sample_name,
         "source_url": chosen_url,
         "output_dir": str(output_path),
     }

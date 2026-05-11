@@ -16,8 +16,8 @@ Từ root workspace:
 Luồng `full` sẽ:
 
 - tự bootstrap môi trường nếu thiếu
-- tự chuẩn bị `ODMData` sample `mygla` nếu chưa có
-- tự tải và chuẩn bị toàn bộ split `Dronescapes` đã chọn nếu chưa có
+- tự chuẩn bị suite `ODMData` mặc định `recommended` nếu chưa có
+- tự tải và chuẩn bị toàn bộ suite `Dronescapes` mặc định `all_splits` nếu chưa có
 - chạy self-check trước benchmark
 - chạy các method:
   - `COLMAP + OpenMVS`
@@ -27,10 +27,18 @@ Luồng `full` sẽ:
 
 Mặc định `full` dùng:
 
-- `ODMData`: sample `mygla`
-- `Dronescapes`: full split `test_set_annotated_only`
+- `ODMData`: suite `recommended`
+- `Dronescapes`: suite `all_splits`
 - `top_k_frames = 16`
 - `risk_neighbors = 6`
+
+Muốn benchmark nhiều block `ODMData` trong một lần:
+
+```bash
+/Users/udy/GEO-repo/run_geo_project.sh --odm-benchmark-suite recommended
+```
+
+Preset `recommended` hiện gồm `mygla`, `toledo`, `shitan_tw`, `tuniu_tw_1`.
 
 ## Output chính
 

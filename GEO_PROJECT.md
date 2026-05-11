@@ -45,8 +45,8 @@ Lệnh mặc định:
 
 Mặc định `full` sẽ:
 
-- chuẩn bị `ODMData` sample được chọn
-- tải full split `Dronescapes` được chọn
+- chuẩn bị suite `ODMData` mặc định `recommended`
+- tải và benchmark toàn bộ suite `Dronescapes` mặc định `all_splits`
 - chạy self-check
 - chạy `COLMAP + OpenMVS`, `DUSt3R`, `MASt3R`, `risk_hybrid_real`
 - xuất kết quả vào [output/geo_uav_recon/ready_run](/Users/udy/GEO-repo/output/geo_uav_recon/ready_run)
@@ -67,6 +67,29 @@ Chạy lớn hơn trên máy mạnh:
   --top-k-frames 32 \
   --risk-neighbors 8 \
   --dronescapes-max-frames 0
+```
+
+Chạy benchmark với nhiều block `ODMData` trong một lần:
+
+```bash
+/Users/udy/GEO-repo/run_geo_project.sh \
+  --odm-benchmark-suite recommended
+```
+
+Khi đó config sẽ sinh nhiều dataset:
+
+- `odmdata_mygla_real`
+- `odmdata_toledo_real`
+- `odmdata_shitan_tw_real`
+- `odmdata_tuniu_tw_1_real`
+- `dronescapes_real`
+
+Muốn gọi tường minh chế độ full toàn bộ:
+
+```bash
+/Users/udy/GEO-repo/run_geo_project.sh \
+  --odm-benchmark-suite recommended \
+  --dronescapes-benchmark-suite all_splits
 ```
 
 ## Artifact đầu ra

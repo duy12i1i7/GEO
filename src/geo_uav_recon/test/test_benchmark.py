@@ -9,10 +9,41 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from geo_uav_recon.benchmark import run_benchmark
+from geo_uav_recon.benchmark import run_benchmark, write_real_benchmark_config
 
 
 class TestBenchmark(unittest.TestCase):
+    def test_write_real_config_with_multiple_odm_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            payload = write_real_benchmark_config(
+                config_path=str(root / "benchmark.json"),
+                output_dir=str(root / "out"),
+                python_bin="python3",
+                top_k_frames=16,
+                risk_neighbors=6,
+                coarse_image_size=224,
+                refine_image_size=512,
+                coarse_device="cpu",
+                refine_device="cpu",
+                window_size=2,
+                batch_size=1,
+                odm_roots=[str(root / "odmdata_mygla"), str(root / "odmdata_tuniu_tw_1")],
+                dronescapes_roots=[str(root / "dronescapes_test_set"), str(root / "dronescapes_validation_set")],
+                skip_colmap_openmvs=True,
+                root_dir=str(root),
+            )
+            dataset_names = [entry["name"] for entry in payload["datasets"]]
+            self.assertEqual(
+                dataset_names,
+                [
+                    "odmdata_mygla_real",
+                    "odmdata_tuniu_tw_1_real",
+                    "dronescapes_test_set_real",
+                    "dronescapes_validation_set_real",
+                ],
+            )
+
     def test_run_benchmark_pipeline(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
