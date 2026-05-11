@@ -101,6 +101,9 @@ build_openmvs() {
   local triplet_path="$overlay_triplets_dir/$vcpkg_triplet.cmake"
   local host_triplet_path="$overlay_triplets_dir/$vcpkg_host_triplet.cmake"
   local openmvs_use_cuda="OFF"
+  local vcpkg_installed_root="$openmvs_dir/vcpkg_installed"
+  local vcpkg_prefix_dir=""
+  local vcpkg_debug_prefix_dir=""
   local build_jobs
   build_jobs="$(resolve_build_jobs)"
   export CMAKE_BUILD_PARALLEL_LEVEL="$build_jobs"
@@ -120,6 +123,8 @@ build_openmvs() {
   else
     log "nvcc not found; OpenMVS will be built without CUDA acceleration"
   fi
+  vcpkg_prefix_dir="$vcpkg_installed_root/$vcpkg_triplet"
+  vcpkg_debug_prefix_dir="$vcpkg_prefix_dir/debug"
   clone_or_update_repo "https://github.com/cdcseacave/openMVS.git" "$openmvs_dir"
   clone_or_update_repo "https://github.com/microsoft/vcpkg.git" "$VCPKG_ROOT"
   if [[ ! -x "$VCPKG_ROOT/vcpkg" ]]; then
