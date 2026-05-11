@@ -51,7 +51,7 @@ install_apt_deps() {
   run_root bash -lc "$APT_UPDATE"
   run_root bash -lc "$APT_INSTALL software-properties-common curl git build-essential cmake ninja-build pkg-config"
   run_root bash -lc "$APT_INSTALL python3 python3-venv python3-pip"
-  run_root bash -lc "$APT_INSTALL autoconf autoconf-archive automake libtool"
+  run_root bash -lc "$APT_INSTALL autoconf autoconf-archive automake libtool bison flex"
   run_root bash -lc "$APT_INSTALL libeigen3-dev libboost-all-dev libopencv-dev"
   run_root bash -lc "$APT_INSTALL libfreeimage-dev libgflags-dev libgoogle-glog-dev"
   run_root bash -lc "$APT_INSTALL libglew-dev libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev"
