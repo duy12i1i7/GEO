@@ -85,7 +85,7 @@ install_apt_deps() {
   run_root bash -lc "$APT_INSTALL libeigen3-dev libboost-all-dev libopencv-dev"
   run_root bash -lc "$APT_INSTALL libfreeimage-dev libgflags-dev libgoogle-glog-dev"
   run_root bash -lc "$APT_INSTALL libglew-dev libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev"
-  run_root bash -lc "$APT_INSTALL libx11-dev libxrandr-dev libxi-dev libxxf86vm-dev libxcursor-dev"
+  run_root bash -lc "$APT_INSTALL libx11-dev libxrandr-dev libxi-dev libxxf86vm-dev libxcursor-dev libxtst-dev"
   run_root bash -lc "$APT_INSTALL libcgal-dev libceres-dev libflann-dev qtbase5-dev"
   if [[ "$WITH_COLMAP" == "1" ]]; then
     run_root bash -lc "$APT_INSTALL colmap"
