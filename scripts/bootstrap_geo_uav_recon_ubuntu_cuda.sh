@@ -10,6 +10,7 @@ WITH_APT="${WITH_APT:-1}"
 WITH_COLMAP="${WITH_COLMAP:-1}"
 WITH_OPENMVS="${WITH_OPENMVS:-1}"
 USE_SUDO="${USE_SUDO:-1}"
+VCPKG_ROOT="${VCPKG_ROOT:-$ROOT_DIR/.external/vcpkg}"
 APT_INSTALL="apt-get install -y"
 APT_UPDATE="apt-get update"
 
@@ -50,6 +51,7 @@ install_apt_deps() {
   run_root bash -lc "$APT_UPDATE"
   run_root bash -lc "$APT_INSTALL software-properties-common curl git build-essential cmake ninja-build pkg-config"
   run_root bash -lc "$APT_INSTALL python3 python3-venv python3-pip"
+  run_root bash -lc "$APT_INSTALL autoconf autoconf-archive automake libtool"
   run_root bash -lc "$APT_INSTALL libeigen3-dev libboost-all-dev libopencv-dev"
   run_root bash -lc "$APT_INSTALL libfreeimage-dev libgflags-dev libgoogle-glog-dev"
   run_root bash -lc "$APT_INSTALL libglew-dev libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev"
@@ -63,13 +65,24 @@ install_apt_deps() {
 build_openmvs() {
   local openmvs_dir="$ROOT_DIR/.external/openMVS"
   local openmvs_build="$ROOT_DIR/.external/openMVS_build"
+  local vcpkg_triplet="x64-linux"
+  if [[ "$(uname -m)" == "aarch64" || "$(uname -m)" == "arm64" ]]; then
+    vcpkg_triplet="arm64-linux"
+  fi
   clone_or_update_repo "https://github.com/cdcseacave/openMVS.git" "$openmvs_dir"
+  clone_or_update_repo "https://github.com/microsoft/vcpkg.git" "$VCPKG_ROOT"
+  if [[ ! -x "$VCPKG_ROOT/vcpkg" ]]; then
+    log "bootstrapping vcpkg"
+    VCPKG_DISABLE_METRICS=1 "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+  fi
   log "configuring OpenMVS with CUDA"
-  cmake \
+  VCPKG_ROOT="$VCPKG_ROOT" VCPKG_DISABLE_METRICS=1 cmake \
     -S "$openmvs_dir" \
     -B "$openmvs_build" \
     -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+    -DVCPKG_TARGET_TRIPLET="$vcpkg_triplet" \
     -DOpenMVS_BUILD_VIEWER=OFF \
     -DOpenMVS_ENABLE_TESTS=OFF \
     -DOpenMVS_USE_CUDA=ON \
