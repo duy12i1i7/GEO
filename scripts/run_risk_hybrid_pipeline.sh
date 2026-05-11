@@ -71,7 +71,7 @@ if [[ -z "$DATASET_ROOT" || -z "$OUTPUT_DIR" ]]; then
   exit 2
 fi
 
-export PYTHONPATH="$ROOT_DIR/src/hawkbot_uav_usegeo:$ROOT_DIR/.external/dust3r:$ROOT_DIR/.external/mast3r${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$ROOT_DIR/src/geo_uav_recon:$ROOT_DIR/.external/dust3r:$ROOT_DIR/.external/mast3r${PYTHONPATH:+:$PYTHONPATH}"
 
 SELECT_DIR="$OUTPUT_DIR/select"
 COARSE_DIR="$OUTPUT_DIR/coarse"
@@ -84,7 +84,7 @@ mkdir -p "$SELECT_DIR" "$COARSE_DIR" "$REFINE_DIR" "$MERGED_DIR"
 START_SEC="$("$PYTHON_BIN" -c 'import time; print(time.perf_counter())')"
 
 SELECT_ARGS=(
-  -m hawkbot_uav_usegeo.cli select-frames
+  -m geo_uav_recon.cli select-frames
   --dataset-kind "$DATASET_KIND"
   --dataset-root "$DATASET_ROOT"
   --output-dir "$SELECT_DIR"
@@ -99,7 +99,7 @@ fi
 
 FRAME_LIST="$SELECT_DIR/selected_frames.txt"
 
-"$PYTHON_BIN" -m hawkbot_uav_usegeo.cli dust3r-export \
+"$PYTHON_BIN" -m geo_uav_recon.cli dust3r-export \
   --dataset-kind "$DATASET_KIND" \
   --dataset-root "$DATASET_ROOT" \
   --output-dir "$COARSE_DIR" \
@@ -109,7 +109,7 @@ FRAME_LIST="$SELECT_DIR/selected_frames.txt"
   --device "$COARSE_DEVICE" \
   --model-name "$COARSE_MODEL" >/dev/null
 
-"$PYTHON_BIN" -m hawkbot_uav_usegeo.cli mast3r-export \
+"$PYTHON_BIN" -m geo_uav_recon.cli mast3r-export \
   --dataset-kind "$DATASET_KIND" \
   --dataset-root "$DATASET_ROOT" \
   --output-dir "$REFINE_DIR" \
@@ -129,7 +129,7 @@ print(f"{end - start:.6f}")
 PY
 )"
 
-"$PYTHON_BIN" -m hawkbot_uav_usegeo.cli merge-depths \
+"$PYTHON_BIN" -m geo_uav_recon.cli merge-depths \
   --dataset-kind "$DATASET_KIND" \
   --dataset-root "$DATASET_ROOT" \
   --output-dir "$MERGED_DIR" \

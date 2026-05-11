@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from hawkbot_uav_usegeo.dataset import load_dataset
+from geo_uav_recon.dataset import load_dataset
 
 
 class TestDatasetLoading(unittest.TestCase):

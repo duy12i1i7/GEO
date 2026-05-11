@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from hawkbot_uav_usegeo.realdata import export_dronescapes_subset, prepare_odm_dataset
+from geo_uav_recon.realdata import export_dronescapes_subset, prepare_odm_dataset
 
 
 class TestRealDataHelpers(unittest.TestCase):

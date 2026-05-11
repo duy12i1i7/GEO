@@ -463,12 +463,12 @@ def write_real_benchmark_config(
             {
                 "name": "dust3r_real",
                 "kind": "command_external",
-                "command": f"PYTHONPATH={root}/src/hawkbot_uav_usegeo:{root}/.external/dust3r:{root}/.external/mast3r {python_bin} -m hawkbot_uav_usegeo.cli dust3r-export --dataset-kind {{dataset_kind}} --dataset-root {{dataset_root}} --output-dir {{output_dir}} --window-size {window_size} --batch-size {batch_size} --image-size {coarse_image_size} --device {coarse_device} --model-name naver/DUSt3R_ViTLarge_BaseDecoder_224_linear",
+                "command": f"PYTHONPATH={root}/src/geo_uav_recon:{root}/.external/dust3r:{root}/.external/mast3r {python_bin} -m geo_uav_recon.cli dust3r-export --dataset-kind {{dataset_kind}} --dataset-root {{dataset_root}} --output-dir {{output_dir}} --window-size {window_size} --batch-size {batch_size} --image-size {coarse_image_size} --device {coarse_device} --model-name naver/DUSt3R_ViTLarge_BaseDecoder_224_linear",
             },
             {
                 "name": "mast3r_real",
                 "kind": "command_external",
-                "command": f"PYTHONPATH={root}/src/hawkbot_uav_usegeo:{root}/.external/dust3r:{root}/.external/mast3r {python_bin} -m hawkbot_uav_usegeo.cli mast3r-export --dataset-kind {{dataset_kind}} --dataset-root {{dataset_root}} --output-dir {{output_dir}} --window-size {window_size} --batch-size {batch_size} --image-size {refine_image_size} --device {refine_device}",
+                "command": f"PYTHONPATH={root}/src/geo_uav_recon:{root}/.external/dust3r:{root}/.external/mast3r {python_bin} -m geo_uav_recon.cli mast3r-export --dataset-kind {{dataset_kind}} --dataset-root {{dataset_root}} --output-dir {{output_dir}} --window-size {window_size} --batch-size {batch_size} --image-size {refine_image_size} --device {refine_device}",
             },
         ]
     )

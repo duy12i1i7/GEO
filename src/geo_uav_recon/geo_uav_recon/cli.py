@@ -12,7 +12,7 @@ from .risk import select_frames
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="hawkbot_uav_usegeo.cli")
+    parser = argparse.ArgumentParser(prog="geo_uav_recon.cli")
     sub = parser.add_subparsers(dest="command", required=True)
 
     odm_sources = sub.add_parser("odm-sources")

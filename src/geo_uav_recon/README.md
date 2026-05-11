@@ -1,4 +1,4 @@
-# hawkbot_uav_usegeo
+# geo_uav_recon
 
 Package Python cho pipeline benchmark UAV reconstruction dùng cặp dataset:
 
@@ -10,7 +10,7 @@ Package Python cho pipeline benchmark UAV reconstruction dùng cặp dataset:
 Từ root workspace:
 
 ```bash
-/Users/udy/hawkbot/run_geo_project.sh
+/Users/udy/GEO-repo/run_geo_project.sh
 ```
 
 Luồng `full` sẽ:
@@ -36,16 +36,16 @@ Mặc định `full` dùng:
 
 Artifact mặc định nằm ở:
 
-- `/Users/udy/hawkbot/output/hawkbot_uav_usegeo/ready_run/benchmark_summary.json`
-- `/Users/udy/hawkbot/output/hawkbot_uav_usegeo/ready_run/benchmark_report.html`
-- `/Users/udy/hawkbot/output/hawkbot_uav_usegeo/ready_run/benchmark_metrics.csv`
+- `/Users/udy/GEO-repo/output/geo_uav_recon/ready_run/benchmark_summary.json`
+- `/Users/udy/GEO-repo/output/geo_uav_recon/ready_run/benchmark_report.html`
+- `/Users/udy/GEO-repo/output/geo_uav_recon/ready_run/benchmark_metrics.csv`
 
 ## Chạy trên máy mạnh hơn
 
 Ví dụ dùng GPU và tăng ngân sách refine:
 
 ```bash
-/Users/udy/hawkbot/run_geo_project.sh \
+/Users/udy/GEO-repo/run_geo_project.sh \
   --coarse-device cuda \
   --refine-device cuda \
   --batch-size 4 \
@@ -56,7 +56,7 @@ Ví dụ dùng GPU và tăng ngân sách refine:
 Muốn đổi split hoặc giữ full split nhưng đổi kích thước benchmark:
 
 ```bash
-/Users/udy/hawkbot/run_geo_project.sh \
+/Users/udy/GEO-repo/run_geo_project.sh \
   --dronescapes-split train_set \
   --dronescapes-max-frames 0
 ```

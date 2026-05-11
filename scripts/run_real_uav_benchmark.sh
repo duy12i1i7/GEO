@@ -129,12 +129,12 @@ if [[ "$SKIP_COLMAP_OPENMVS" != "1" ]]; then
   fi
 fi
 
-export PYTHONPATH="$ROOT_DIR/src/hawkbot_uav_usegeo${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$ROOT_DIR/src/geo_uav_recon${PYTHONPATH:+:$PYTHONPATH}"
 
 if [[ -z "$ODM_ROOT" && -n "$ODM_OUTPUT_ROOT" ]]; then
   ODM_ROOT="$ODM_OUTPUT_ROOT"
   ODM_ARGS=(
-    -m hawkbot_uav_usegeo.cli prepare-odm
+    -m geo_uav_recon.cli prepare-odm
     --output-dir "$ODM_OUTPUT_ROOT"
     --sample-name "$ODM_SAMPLE_NAME"
   )
@@ -153,7 +153,7 @@ fi
 if [[ -z "$DRONESCAPES_ROOT" && -n "$DRONESCAPES_OUTPUT_ROOT" ]]; then
   DRONESCAPES_ROOT="$DRONESCAPES_OUTPUT_ROOT"
   SUBSET_ARGS=(
-    -m hawkbot_uav_usegeo.cli dronescapes-subset
+    -m geo_uav_recon.cli dronescapes-subset
     --output-dir "$DRONESCAPES_OUTPUT_ROOT"
     --repo-id "$DRONESCAPES_REPO_ID"
     --split "$DRONESCAPES_SPLIT"
@@ -172,14 +172,14 @@ if [[ -z "$DRONESCAPES_ROOT" && -n "$DRONESCAPES_OUTPUT_ROOT" ]]; then
 fi
 
 if [[ -n "$ODM_ROOT" ]]; then
-  "$PYTHON_BIN" -m hawkbot_uav_usegeo.cli validate-dataset --dataset-kind odmdata --dataset-root "$ODM_ROOT" >/dev/null
+  "$PYTHON_BIN" -m geo_uav_recon.cli validate-dataset --dataset-kind odmdata --dataset-root "$ODM_ROOT" >/dev/null
 fi
 if [[ -n "$DRONESCAPES_ROOT" ]]; then
-  "$PYTHON_BIN" -m hawkbot_uav_usegeo.cli validate-dataset --dataset-kind dronescapes --dataset-root "$DRONESCAPES_ROOT" >/dev/null
+  "$PYTHON_BIN" -m geo_uav_recon.cli validate-dataset --dataset-kind dronescapes --dataset-root "$DRONESCAPES_ROOT" >/dev/null
 fi
 
 CONFIG_ARGS=(
-  -m hawkbot_uav_usegeo.cli write-real-config
+  -m geo_uav_recon.cli write-real-config
   --config-path "$CONFIG_PATH"
   --output-dir "$OUTPUT_DIR"
   --python-bin "$PYTHON_BIN"
@@ -206,7 +206,7 @@ else
 fi
 
 "$PYTHON_BIN" "${CONFIG_ARGS[@]}" >/dev/null
-"$PYTHON_BIN" -m hawkbot_uav_usegeo.cli benchmark --config "$CONFIG_PATH" --output-dir "$OUTPUT_DIR"
+"$PYTHON_BIN" -m geo_uav_recon.cli benchmark --config "$CONFIG_PATH" --output-dir "$OUTPUT_DIR"
 
 printf '\nArtifacts:\n'
 printf '  %s\n' "$OUTPUT_DIR/benchmark_summary.json"

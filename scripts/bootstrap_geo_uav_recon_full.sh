@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PACKAGE_DIR="$ROOT_DIR/src/hawkbot_uav_usegeo"
+PACKAGE_DIR="$ROOT_DIR/src/geo_uav_recon"
 MICROMAMBA_ROOT="${MICROMAMBA_ROOT:-$ROOT_DIR/.micromamba}"
-ENV_PATH="${ENV_PATH:-$MICROMAMBA_ROOT/envs/uav-usegeo-full}"
+ENV_PATH="${ENV_PATH:-$MICROMAMBA_ROOT/envs/geo-uav-recon-full}"
 WITH_OPENMVS="${WITH_OPENMVS:-0}"
 WITH_COLMAP="${WITH_COLMAP:-1}"
 
@@ -80,7 +80,7 @@ log "installing project base requirements"
 log "installing torch stack"
 "${RUN_IN_ENV[@]}" python -m pip install -r "$PACKAGE_DIR/requirements/deep_optional.txt"
 
-log "installing hawkbot_uav_usegeo in editable mode"
+log "installing geo_uav_recon in editable mode"
 "${RUN_IN_ENV[@]}" python -m pip install -e "$PACKAGE_DIR"
 
 mkdir -p "$ROOT_DIR/.external"
@@ -136,7 +136,7 @@ Run commands inside the environment with:
   $MICROMAMBA_BIN run -r "$MICROMAMBA_ROOT" -p "$ENV_PATH" <command>
 
 Example:
-  $MICROMAMBA_BIN run -r "$MICROMAMBA_ROOT" -p "$ENV_PATH" python -m hawkbot_uav_usegeo.cli --help
+  $MICROMAMBA_BIN run -r "$MICROMAMBA_ROOT" -p "$ENV_PATH" python -m geo_uav_recon.cli --help
 
 Project entrypoint:
   "$ROOT_DIR/run_geo_project.sh"

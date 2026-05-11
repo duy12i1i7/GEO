@@ -1,126 +1,83 @@
 # GEO Project
 
-This workspace still contains the original `hawkbot` ROS2 codebase, but the UAV reconstruction
-research project is now self-contained in the following paths:
+## Phạm vi
 
-- package: `/Users/udy/hawkbot/src/hawkbot_uav_usegeo`
-- scripts: `/Users/udy/hawkbot/scripts`
-- report: `/Users/udy/hawkbot/report`
-- real-data outputs: `/Users/udy/hawkbot/output/hawkbot_uav_usegeo`
+Repo này triển khai một benchmark UAV reconstruction độc lập, tập trung vào câu hỏi:
 
-## What the project does
+`Có thể giữ chất lượng tái tạo gần với phương pháp refine nặng, trong khi chỉ dành compute cho các frame rủi ro cao hay không?`
 
-The project studies one concrete question:
+Thiết lập hiện tại dùng hai dataset thật:
 
-`Can UAV reconstruction quality be preserved while spending expensive refinement only on risky frames?`
+- `Dronescapes`: benchmark định lượng với depth tham chiếu
+- `ODMData`: workload photogrammetry UAV thực tế
 
-To answer that, the codebase now uses a pragmatic two-dataset setup:
+## Pipeline
 
-- `Dronescapes`
-  - quantitative benchmark with paired RGB/depth frames
-- `ODMData`
-  - real UAV photogrammetry image blocks for runtime and qualitative reconstruction comparison
+Phương pháp đề xuất `risk-guided hybrid refinement` chạy theo bốn bước:
 
-This pairing is practical because `Dronescapes` provides evaluation targets, while `ODMData`
-behaves like a realistic photogrammetry workload that `COLMAP + OpenMVS`, `DUSt3R`, `MASt3R`,
-and the risk-guided hybrid method can all process directly.
+1. `DUSt3R` dựng depth/reconstruction thô trên toàn bộ frame
+2. mô-đun `risk.py` chấm điểm rủi ro dựa trên overlap, texture, depth gap và view diversity
+3. chỉ `top-k` frame rủi ro cao mới được refine bằng `MASt3R`
+4. benchmark tổng hợp chất lượng, runtime, selected ratio, và artifact hình học
 
-## Main entrypoints
+## Mã nguồn chính
 
-### One-command run
+- package: [src/geo_uav_recon](/Users/udy/GEO-repo/src/geo_uav_recon)
+- scripts: [scripts](/Users/udy/GEO-repo/scripts)
+- survey/report: [report](/Users/udy/GEO-repo/report)
+
+Các file quan trọng trong package:
+
+- [dataset.py](/Users/udy/GEO-repo/src/geo_uav_recon/geo_uav_recon/dataset.py)
+- [realdata.py](/Users/udy/GEO-repo/src/geo_uav_recon/geo_uav_recon/realdata.py)
+- [predictors.py](/Users/udy/GEO-repo/src/geo_uav_recon/geo_uav_recon/predictors.py)
+- [risk.py](/Users/udy/GEO-repo/src/geo_uav_recon/geo_uav_recon/risk.py)
+- [benchmark.py](/Users/udy/GEO-repo/src/geo_uav_recon/geo_uav_recon/benchmark.py)
+- [cli.py](/Users/udy/GEO-repo/src/geo_uav_recon/geo_uav_recon/cli.py)
+
+## Cách chạy
+
+Lệnh mặc định:
 
 ```bash
-/Users/udy/hawkbot/run_geo_project.sh
+/Users/udy/GEO-repo/run_geo_project.sh
 ```
 
-Default behavior:
+Mặc định `full` sẽ:
 
-- runs in `full` mode by default
-- uses the prepared full environment if available
-- otherwise bootstraps it automatically
-- runs the package self-checks before any benchmark
-- prepares `ODMData` and the full selected `Dronescapes` split under `/Users/udy/hawkbot/data/hawkbot_uav_usegeo`
-- validates that both real datasets are available before benchmarking
-- runs the benchmark end to end
-- writes the final HTML/JSON/CSV artifacts under `/Users/udy/hawkbot/output/hawkbot_uav_usegeo/ready_run/`
+- chuẩn bị `ODMData` sample được chọn
+- tải full split `Dronescapes` được chọn
+- chạy self-check
+- chạy `COLMAP + OpenMVS`, `DUSt3R`, `MASt3R`, `risk_hybrid_real`
+- xuất kết quả vào [output/geo_uav_recon/ready_run](/Users/udy/GEO-repo/output/geo_uav_recon/ready_run)
 
-By default the script prepares the official `ODMData` sample `mygla`, because it is a small real
-UAV block that the official `ODMData` index labels as a good starter dataset.
-
-Optional overrides:
+Chế độ nhanh:
 
 ```bash
-/Users/udy/hawkbot/run_geo_project.sh --odm-sample-name toledo
+/Users/udy/GEO-repo/run_geo_project.sh --mode quick
 ```
 
-```bash
-/Users/udy/hawkbot/run_geo_project.sh --odm-archive-path /path/to/odm_sample.zip
-```
+Chạy lớn hơn trên máy mạnh:
 
 ```bash
-/Users/udy/hawkbot/run_geo_project.sh --odm-root /path/to/prepared_odmdata
-```
-
-Lightweight real-data path:
-
-```bash
-/Users/udy/hawkbot/run_geo_project.sh --mode quick
-```
-
-`quick` only prepares `Dronescapes` and skips the `COLMAP + OpenMVS` baseline.
-
-Default full-download location for `Dronescapes`:
-
-- `/Users/udy/hawkbot/data/hawkbot_uav_usegeo/dronescapes_full_test_set_annotated_only`
-
-Example for a stronger machine with GPU:
-
-```bash
-/Users/udy/hawkbot/run_geo_project.sh \
+/Users/udy/GEO-repo/run_geo_project.sh \
   --coarse-device cuda \
   --refine-device cuda \
   --batch-size 4 \
   --top-k-frames 32 \
-  --risk-neighbors 8
+  --risk-neighbors 8 \
+  --dronescapes-max-frames 0
 ```
 
-### Proposal pipeline
+## Artifact đầu ra
 
-```bash
-/Users/udy/hawkbot/scripts/run_risk_hybrid_pipeline.sh \
-  --dataset-kind odmdata \
-  --dataset-root /path/to/odmdata_sample \
-  --output-dir /tmp/odm_risk_hybrid \
-  --python-bin /Users/udy/hawkbot/.micromamba/envs/uav-usegeo-full/bin/python
-```
+Sau mỗi lần chạy, các file chính là:
 
-### Real benchmark orchestration
+- [benchmark_summary.json](/Users/udy/GEO-repo/output/geo_uav_recon/ready_run/benchmark_summary.json)
+- [benchmark_report.html](/Users/udy/GEO-repo/output/geo_uav_recon/ready_run/benchmark_report.html)
+- [benchmark_metrics.csv](/Users/udy/GEO-repo/output/geo_uav_recon/ready_run/benchmark_metrics.csv)
 
-```bash
-/Users/udy/hawkbot/scripts/run_real_uav_benchmark.sh \
-  --odm-output-root /tmp/odmdata_mygla \
-  --dronescapes-output-root /tmp/dronescapes_subset \
-  --python-bin /Users/udy/hawkbot/.micromamba/envs/uav-usegeo-full/bin/python
-```
+## Báo cáo
 
-### Benchmark from config
-
-```bash
-PYTHONPATH=/Users/udy/hawkbot/src/hawkbot_uav_usegeo \
-python3 -m hawkbot_uav_usegeo.cli benchmark \
-  --config /Users/udy/hawkbot/output/hawkbot_uav_usegeo/ready_run/benchmark_real.json \
-  --output-dir /Users/udy/hawkbot/output/hawkbot_uav_usegeo/ready_run
-```
-
-## Key outputs
-
-After a run, the main artifacts are:
-
-- `/Users/udy/hawkbot/output/hawkbot_uav_usegeo/ready_run/benchmark_summary.json`
-- `/Users/udy/hawkbot/output/hawkbot_uav_usegeo/ready_run/benchmark_report.html`
-- `/Users/udy/hawkbot/output/hawkbot_uav_usegeo/ready_run/benchmark_metrics.csv`
-
-## Read next
-
-- package guide: `/Users/udy/hawkbot/src/hawkbot_uav_usegeo/README.md`
-- survey/report: `/Users/udy/hawkbot/report/main_vi.pdf`
+- tiếng Anh: [main.pdf](/Users/udy/GEO-repo/report/main.pdf)
+- tiếng Việt: [main_vi.pdf](/Users/udy/GEO-repo/report/main_vi.pdf)

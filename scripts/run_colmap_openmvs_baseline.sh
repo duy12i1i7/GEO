@@ -15,7 +15,7 @@ Usage: $(basename "$0") --dataset-root <path> --output-dir <path> [options]
 
 Options:
   --dataset-kind <odmdata|dronescapes>   Dataset kind (default: odmdata)
-  --dataset-root <path>                 Dataset root consumed by hawkbot_uav_usegeo
+  --dataset-root <path>                 Dataset root consumed by geo_uav_recon
   --output-dir <path>                   Output directory for COLMAP/OpenMVS artifacts
   --python-bin <path>                   Python interpreter for the benchmark CLI
   --colmap-bin <path>                   COLMAP executable (default: first on PATH)
@@ -78,12 +78,12 @@ if [[ ! -x "$INTERFACE_COLMAP" || ! -x "$DENSIFY_POINT_CLOUD" ]]; then
   exit 1
 fi
 
-export PYTHONPATH="$ROOT_DIR/src/hawkbot_uav_usegeo${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$ROOT_DIR/src/geo_uav_recon${PYTHONPATH:+:$PYTHONPATH}"
 
 IMAGE_DIR="$("$PYTHON_BIN" - "$DATASET_KIND" "$DATASET_ROOT" <<'PY'
 import sys
 from pathlib import Path
-from hawkbot_uav_usegeo.dataset import load_dataset
+from geo_uav_recon.dataset import load_dataset
 
 dataset_kind = sys.argv[1]
 dataset_root = sys.argv[2]
@@ -157,7 +157,7 @@ fi
     --number-views 0
 )
 
-"$PYTHON_BIN" -m hawkbot_uav_usegeo.cli colmap-openmvs-export \
+"$PYTHON_BIN" -m geo_uav_recon.cli colmap-openmvs-export \
   --dataset-kind "$DATASET_KIND" \
   --dataset-root "$DATASET_ROOT" \
   --colmap-workspace "$COLMAP_DENSE" \

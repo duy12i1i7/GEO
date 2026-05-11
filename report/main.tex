@@ -178,7 +178,7 @@ This is a moderate but defensible novelty target. It is substantially more reali
 
 \section{Implementation Already Added to the Repository}
 
-An initial scaffold aligned with RGSR-UseGeo has already been added as \texttt{src/hawkbot\_uav\_usegeo}. The implementation mirrors the reduced thesis directly:
+The current repository now provides a runnable experimental package at \texttt{src/geo\_uav\_recon}. The implementation has already been updated from the early single-dataset scaffold into a two-dataset benchmark centered on \texttt{Dronescapes + ODMData}:
 
 \begin{table}[t]
 \centering
@@ -187,24 +187,23 @@ An initial scaffold aligned with RGSR-UseGeo has already been added as \texttt{s
 \toprule
 \textbf{Source component} & \textbf{Role} \\
 \midrule
-\texttt{dataset.py} & discovers a UseGeo-style layout and parses frames, poses, and optional depth maps \\
-\texttt{camera.py} & basic camera geometry and depth back-projection \\
-\texttt{quick\_map.py} & builds a lightweight coverage map and exports \texttt{PGM + YAML} \\
-\texttt{risk.py} & computes per-frame risk from geometry, texture, and depth completeness \\
-\texttt{fusion.py} & selective fusion baseline: coarse stride for all frames, denser stride for top-$K$ risky frames \\
-\texttt{pipeline.py} & orchestrates the end-to-end baseline and exports \texttt{JSON/CSV/XYZ} summaries \\
-\texttt{cli.py} & exposes three commands: \texttt{summary}, \texttt{quick-map}, and \texttt{reconstruct} \\
+\texttt{dataset.py} & discovers \texttt{Dronescapes} and \texttt{ODMData} layouts and normalizes image, pose, and optional depth inputs \\
+\texttt{realdata.py} & prepares official dataset downloads, validates local copies, and writes benchmark-ready manifests \\
+\texttt{predictors.py} & wraps external baselines such as \texttt{DUSt3R}, \texttt{MASt3R}, and \texttt{COLMAP + OpenMVS} \\
+\texttt{risk.py} & computes reconstruction risk from overlap, texture, depth gap, and viewing diversity \\
+\texttt{benchmark.py} & orchestrates evaluation, pseudo-reference handling for \texttt{ODMData}, and report export \\
+\texttt{cli.py} & exposes dataset preparation, validation, export, and benchmark commands \\
 \bottomrule
 \end{tabularx}
-\caption{Implemented scaffold for the reduced RGSR-UseGeo direction.}
+\caption{Implemented package for the current GEO benchmark direction.}
 \end{table}
 
-The current code is not a final research method. It is a \textbf{working experimental baseline} that is already sufficient to:
+The current code is not a final publishable method. It is a \textbf{working experimental package} that is already sufficient to:
 \begin{enumerate}[leftmargin=1.5em]
-  \item validate UseGeo loading,
-  \item generate a quick coverage map,
+  \item prepare and validate the two real datasets used in the project,
+  \item run classical and learned reconstruction baselines end to end,
   \item rank frames by reconstruction risk,
-  \item and run selective point-cloud fusion on ground-truth or converted predicted depth.
+  \item and benchmark selective refinement against full-pass alternatives.
 \end{enumerate}
 
 \section{Proposed Experimental Protocol}

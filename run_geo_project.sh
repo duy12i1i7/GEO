@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DATA_ROOT="$ROOT_DIR/data/hawkbot_uav_usegeo"
-OUTPUT_ROOT="$ROOT_DIR/output/hawkbot_uav_usegeo"
+DATA_ROOT="$ROOT_DIR/data/geo_uav_recon"
+OUTPUT_ROOT="$ROOT_DIR/output/geo_uav_recon"
 MODE="full"
 ODM_ROOT=""
 ODM_OUTPUT_ROOT=""
@@ -122,8 +122,8 @@ if [[ "$MODE" != "quick" && "$MODE" != "full" ]]; then
 fi
 
 if [[ -z "$PYTHON_BIN" ]]; then
-  if [[ -x "$ROOT_DIR/.micromamba/envs/uav-usegeo-full/bin/python" ]]; then
-    PYTHON_BIN="$ROOT_DIR/.micromamba/envs/uav-usegeo-full/bin/python"
+  if [[ -x "$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python" ]]; then
+    PYTHON_BIN="$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python"
   else
     PYTHON_BIN="python3"
   fi
@@ -134,13 +134,13 @@ if [[ ! -x "$PYTHON_BIN" && "$PYTHON_BIN" != "python3" ]]; then
   exit 1
 fi
 
-if [[ ! -x "$ROOT_DIR/.micromamba/envs/uav-usegeo-full/bin/python" && "$AUTO_BOOTSTRAP" == "1" ]]; then
+if [[ ! -x "$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python" && "$AUTO_BOOTSTRAP" == "1" ]]; then
   if [[ "$MODE" == "full" || -n "$ODM_ROOT" || -n "$ODM_OUTPUT_ROOT" ]]; then
-    WITH_OPENMVS=1 "$ROOT_DIR/scripts/bootstrap_uav_usegeo_full.sh"
+    WITH_OPENMVS=1 "$ROOT_DIR/scripts/bootstrap_geo_uav_recon_full.sh"
   else
-    WITH_OPENMVS=0 "$ROOT_DIR/scripts/bootstrap_uav_usegeo_full.sh"
+    WITH_OPENMVS=0 "$ROOT_DIR/scripts/bootstrap_geo_uav_recon_full.sh"
   fi
-  PYTHON_BIN="$ROOT_DIR/.micromamba/envs/uav-usegeo-full/bin/python"
+  PYTHON_BIN="$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python"
 fi
 
 if [[ -z "$ODM_ROOT" && -z "$ODM_OUTPUT_ROOT" && "$MODE" == "full" ]]; then
@@ -149,14 +149,14 @@ fi
 
 if [[ "$AUTO_BOOTSTRAP" == "1" && "$MODE" == "full" ]]; then
   if [[ ! -x "$ROOT_DIR/.external/openMVS_build/bin/InterfaceCOLMAP" || ! -x "$ROOT_DIR/.external/openMVS_build/bin/DensifyPointCloud" ]]; then
-    WITH_OPENMVS=1 "$ROOT_DIR/scripts/bootstrap_uav_usegeo_full.sh"
-    PYTHON_BIN="$ROOT_DIR/.micromamba/envs/uav-usegeo-full/bin/python"
+    WITH_OPENMVS=1 "$ROOT_DIR/scripts/bootstrap_geo_uav_recon_full.sh"
+    PYTHON_BIN="$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python"
   fi
 fi
 
 if [[ "$RUN_TESTS" == "1" ]]; then
-  PYTHONPATH="$ROOT_DIR/src/hawkbot_uav_usegeo" \
-    "$PYTHON_BIN" -m unittest discover -s "$ROOT_DIR/src/hawkbot_uav_usegeo/test" -v >/dev/null
+  PYTHONPATH="$ROOT_DIR/src/geo_uav_recon" \
+    "$PYTHON_BIN" -m unittest discover -s "$ROOT_DIR/src/geo_uav_recon/test" -v >/dev/null
 fi
 
 if [[ -z "$DRONESCAPES_ROOT" ]]; then

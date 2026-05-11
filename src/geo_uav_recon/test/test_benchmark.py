@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from hawkbot_uav_usegeo.benchmark import run_benchmark
+from geo_uav_recon.benchmark import run_benchmark
 
 
 class TestBenchmark(unittest.TestCase):

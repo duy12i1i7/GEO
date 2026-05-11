@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from hawkbot_uav_usegeo.benchmark import merge_depths
-from hawkbot_uav_usegeo.risk import select_frames
+from geo_uav_recon.benchmark import merge_depths
+from geo_uav_recon.risk import select_frames
 
 
 class TestPipeline(unittest.TestCase):

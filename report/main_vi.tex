@@ -178,7 +178,7 @@ Hợp nhất tái tạo thô và phần tinh chỉnh chọn lọc để sinh:
 
 \section{Triển khai hiện tại trong repo}
 
-Phần scaffold ban đầu đã được triển khai trong package mới \texttt{src/hawkbot\_uav\_usegeo}. Cấu trúc hiện tại bám trực tiếp theo hướng RGSR-UseGeo:
+Repo hiện tại đã có package thực nghiệm chạy được tại \texttt{src/geo\_uav\_recon}. Phần cài đặt này đã được cập nhật từ scaffold đơn-dataset ban đầu sang benchmark hai dataset \texttt{Dronescapes + ODMData}:
 
 \begin{table}[t]
 \centering
@@ -187,24 +187,23 @@ Phần scaffold ban đầu đã được triển khai trong package mới \textt
 \toprule
 \textbf{Thành phần mã nguồn} & \textbf{Chức năng} \\
 \midrule
-\texttt{dataset.py} & dò cấu trúc UseGeo, đọc ảnh, pose, depth và chuẩn hóa thành danh sách frame \\
-\texttt{camera.py} & hình học camera cơ bản, back-projection depth sang point cloud \\
-\texttt{quick\_map.py} & tạo coverage map nhẹ và xuất \texttt{PGM + YAML} \\
-\texttt{risk.py} & tính điểm rủi ro cho từng frame từ geometry, texture và depth completeness \\
-\texttt{fusion.py} & selective fusion: toàn block dùng stride thô, top-$K$ frame rủi ro dùng stride dày hơn \\
-\texttt{pipeline.py} & điều phối toàn pipeline và lưu tổng kết ra \texttt{JSON/CSV/XYZ} \\
-\texttt{cli.py} & cung cấp ba lệnh: \texttt{summary}, \texttt{quick-map}, \texttt{reconstruct} \\
+\texttt{dataset.py} & dò cấu trúc \texttt{Dronescapes} và \texttt{ODMData}, đọc ảnh, pose và depth nếu có, rồi chuẩn hóa thành danh sách frame \\
+\texttt{realdata.py} & tải dữ liệu chính thức, kiểm tra dataset cục bộ, và tạo manifest sẵn sàng cho benchmark \\
+\texttt{predictors.py} & bọc các baseline ngoài như \texttt{DUSt3R}, \texttt{MASt3R}, và \texttt{COLMAP + OpenMVS} \\
+\texttt{risk.py} & tính điểm rủi ro tái tạo từ overlap, texture, depth gap và độ đa dạng góc nhìn \\
+\texttt{benchmark.py} & điều phối đánh giá, hỗ trợ pseudo-reference cho \texttt{ODMData}, và xuất báo cáo \\
+\texttt{cli.py} & cung cấp các lệnh chuẩn bị dữ liệu, kiểm tra, export và benchmark \\
 \bottomrule
 \end{tabularx}
-\caption{Phần scaffold đã được cài trong repo để khởi động hướng RGSR-UseGeo.}
+\caption{Package đã được cài trong repo cho hướng benchmark hiện tại của GEO.}
 \end{table}
 
-Hiện trạng triển khai này chưa phải là thuật toán nghiên cứu hoàn chỉnh. Nó là một \textbf{baseline thực nghiệm khả dụng} để:
+Hiện trạng triển khai này chưa phải là phương pháp công bố hoàn chỉnh. Nó là một \textbf{package thực nghiệm khả dụng} để:
 \begin{enumerate}[leftmargin=1.5em]
-  \item kiểm tra loader của UseGeo,
-  \item sinh quick coverage map,
+  \item chuẩn bị và kiểm tra hai dataset thật của dự án,
+  \item chạy đầy đủ baseline cổ điển và học sâu,
   \item xếp hạng frame theo rủi ro,
-  \item và chạy selective depth fusion trên ground-truth depth hoặc depth dự báo đã chuyển đổi.
+  \item và benchmark selective refinement so với các phương pháp chạy full-pass.
 \end{enumerate}
 
 \section{Thiết kế thực nghiệm đề xuất}
