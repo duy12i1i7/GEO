@@ -116,6 +116,29 @@ Các biến có thể override khi cần:
 THERMAL_SAFE=1 BUILD_JOBS=2 DRONESCAPES_MAX_FRAMES=16 ./scripts/run_poc_balanced_ubuntu_nvidia.sh
 ```
 
+Nếu muốn chạy `full` trên máy Ubuntu + NVIDIA mạnh nhưng hay bị nhiệt, dùng script full thermal-safe:
+
+```bash
+cd ~/GEO
+git pull
+./scripts/run_full_thermal_safe_ubuntu_nvidia.sh
+```
+
+Mặc định script này sẽ:
+- bootstrap khi cần
+- vẫn build `OpenMVS`, nhưng với `BUILD_JOBS=1`
+- chạy `full` với:
+  - `ODMData` suite `recommended`
+  - `Dronescapes` suite `all_splits`
+  - `CPU_THREADS=4`
+  - `BATCH_SIZE=2`
+
+Có thể override:
+
+```bash
+THERMAL_SAFE=1 BUILD_JOBS=1 CPU_THREADS=2 BATCH_SIZE=1 ./scripts/run_full_thermal_safe_ubuntu_nvidia.sh
+```
+
 Nếu máy dễ sập vì nhiệt nhưng vẫn muốn chạy `full`, dùng thermal-safe mode:
 
 ```bash
