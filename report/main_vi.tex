@@ -1,0 +1,260 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage[numbers,sort&compress]{natbib}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\setlength{\parskip}{0.6em}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.15}
+\urlstyle{same}
+
+\title{Khảo sát dataset và đề xuất hướng nghiên cứu gọn cho bài toán tái tạo 2D/2.5D/3D từ chuỗi ảnh UAV trên một dataset duy nhất}
+\author{Biên soạn cho đề tài: tái tạo bản đồ từ chuỗi ảnh liên tiếp thu nhận bởi UAV}
+\date{Ngày 03 tháng 05 năm 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Báo cáo này thu hẹp bài toán tái tạo 2D/2.5D/3D từ chuỗi ảnh UAV về một cấu hình thực dụng hơn: \textbf{chỉ dùng một dataset công khai duy nhất} để vừa triển khai được, vừa còn giữ được giá trị nghiên cứu. Sau khi rà soát mặt bằng các dataset UAV công khai còn truy cập được đến ngày 03/05/2026, báo cáo kết luận rằng \textbf{UseGeo} là lựa chọn phù hợp nhất nếu mục tiêu là nghiên cứu tái tạo hình học từ ảnh UAV mà không phải ghép nhiều nguồn dữ liệu dị loại. Đồng thời, báo cáo đánh giá thẳng rằng hướng ``monocular depth + pose-guided fusion + uncertainty'' theo kiểu full pipeline đã bị phủ khá mạnh bởi các nghiên cứu gần đây trên photogrammetry, monocular priors và benchmark aerial blocks. Vì vậy, thay vì tiếp tục một đề tài quá rộng, báo cáo đề xuất một hướng gọn và khả thi hơn: \textbf{RGSR-UseGeo} (\textit{Risk-Guided Selective Refinement for UseGeo}), tức là tái tạo thô trên toàn block ảnh, sau đó chỉ dành ngân sách tinh chỉnh đắt đỏ cho những vùng hoặc khung hình được dự báo là rủi ro cao. Điểm mới nằm ở \textbf{phân bổ ngân sách tái tạo theo rủi ro hình học và độ khó của block ảnh}, thay vì cố gắng thiết kế một hệ UAV ``làm mọi thứ''. Hướng này không phải là một tuyên bố đột phá tuyệt đối, nhưng là một luận điểm nghiên cứu chặt hơn, trung thực hơn và phù hợp hơn với ràng buộc triển khai thực tế.
+\end{abstract}
+
+\section{Bối cảnh và ràng buộc thiết kế}
+
+Bài toán gốc có thể được phát biểu ngắn gọn như sau: từ một chuỗi ảnh UAV theo thời gian, ước lượng quỹ đạo camera và sinh ra các sản phẩm bản đồ 2D, 2.5D hoặc 3D đủ hữu dụng cho phân tích và mô hình hóa. Văn liệu nền cho thấy UAV photogrammetry, SfM, MVS và georeferencing đã rất trưởng thành \citep{Colomina2014Unmanned,Zhao2014Direct,Jiang2017Efficient,Jiang2020Efficient}. Tuy nhiên, khi ràng buộc thêm điều kiện \textbf{chỉ một dataset}, vấn đề nghiên cứu phải đổi khác. Một đề tài kiểu ``hệ world model UAV hợp nhất online/offline, semantic, uncertainty, active planning'' có thể hấp dẫn về ý tưởng, nhưng quá rộng nếu toàn bộ thực nghiệm chỉ dựa trên một nguồn dữ liệu duy nhất.
+
+Vì vậy, báo cáo này áp dụng ba ràng buộc ngay từ đầu:
+\begin{enumerate}[leftmargin=1.5em]
+  \item chỉ sử dụng một dataset công khai cho toàn bộ dự án;
+  \item ưu tiên bài toán \textbf{tái tạo hình học} hơn là geo-localization hay multi-sensor SLAM;
+  \item đề tài phải đủ gọn để còn có thể triển khai bằng một baseline rõ ràng trong repo hiện tại.
+\end{enumerate}
+
+\section{Mặt bằng dataset UAV công khai hiện có}
+
+Tại thời điểm khảo sát, có thể nhóm các dataset UAV công khai còn truy cập được thành bốn họ chính:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{dataset phục vụ tái tạo 3D và depth}: UseGeo, UAVStereo, một phần Dronescapes;
+  \item \textbf{dataset video UAV cho semantic/depth}: UAVid, UAVid-depth, AeroScapes;
+  \item \textbf{dataset localization hoặc cross-view}: UAV-VisLoc, AerialVL, ALTO;
+  \item \textbf{dataset synthetic hoặc multi-sensor mạnh}: Mid-Air, MUN-FRL, AgriLiRa4D, UAVScenes.
+\end{enumerate}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{1.9cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Dataset} & \textbf{Kiểu dữ liệu} & \textbf{Điểm mạnh} & \textbf{Điểm yếu nếu chỉ dùng một bộ} \\
+\midrule
+UseGeo & Ảnh UAV + GT depth + pose + LiDAR & Phù hợp trực tiếp cho depth, point cloud, mesh, benchmark tái tạo & Nhỏ, chỉ 3 block, không giàu semantic/video \\
+UAVid & Video UAV 4K + semantic + depth phụ trợ & Rất hợp cho segmentation và monocular depth từ video & Không phải benchmark mạnh cho mesh/point cloud survey-grade \\
+Dronescapes & Video/ảnh UAV với nhiều nhãn cảm nhận & Hợp cho perception đa tác vụ & Ít chuẩn hơn UseGeo cho đánh giá MVS/mesh \\
+UAVStereo & Stereo/disparity & Tốt cho stereo benchmark & Quá hẹp nếu muốn làm toàn pipeline mapping \\
+Mid-Air & Synthetic đa modality & Rất tiện để debug hoặc pretrain & Không phù hợp để làm benchmark cuối \\
+UAV-VisLoc / AerialVL & Drone--satellite/cross-view & Mạnh cho định vị GNSS-denied & Không phải trọng tâm dense reconstruction \\
+MUN-FRL / AgriLiRa4D & Camera + LiDAR + IMU + RTK & Rất hợp cho SLAM đa cảm biến & Quá lệch sang multi-sensor, khó giữ đề tài gọn \\
+UAVScenes & Camera + LiDAR + semantic + pose & Giàu modality & Khá lớn và dễ kéo đề tài sang perception tổng hợp \\
+EuRoC MAV & Stereo + IMU indoor & Chuẩn cho VIO & Không phải UAV mapping ngoài trời \\
+\bottomrule
+\end{tabularx}
+\caption{Các dataset công khai tiêu biểu còn truy cập được đến ngày 03/05/2026, xét theo mức độ phù hợp với mục tiêu ``một dataset duy nhất'' cho tái tạo UAV.}
+\end{table}
+
+\section{Vì sao UseGeo là lựa chọn phù hợp nhất}
+
+\textbf{UseGeo} được công bố đúng để đánh giá tái tạo 3D từ ảnh UAV \citep{Nex2024UseGeo}. Theo tài liệu chính thức, bộ dữ liệu này gồm \textbf{829 ảnh} chia trên \textbf{3 block độc lập}, ảnh có độ phân giải \textbf{7952$\times$5304}, có \textbf{ground-truth depth}, \textbf{camera poses}, \textbf{point cloud LiDAR} và \textbf{point cloud quang trắc}. Đây là tổ hợp rất hiếm nếu chỉ được phép dùng đúng một dataset mà vẫn muốn đánh giá:
+\begin{enumerate}[leftmargin=1.5em]
+  \item sai số depth,
+  \item độ chính xác và độ đầy đủ của point cloud,
+  \item và chất lượng tái tạo 3D cuối cùng.
+\end{enumerate}
+
+So với các dataset video hoặc semantic, UseGeo có hai lợi thế quyết định. Thứ nhất, nó \textbf{phục vụ đúng câu hỏi hình học}. Thứ hai, đã tồn tại \textbf{protocol benchmark công khai} cho chính bộ dữ liệu này \citep{Hermann2024UseGeoEval}. Điều đó giúp tránh tình trạng đề tài phải dành quá nhiều công sức cho việc định nghĩa lại toàn bộ bộ đo.
+
+Hệ quả là: nếu chỉ chọn một dataset, UseGeo cho phép khóa đề tài vào một câu hỏi rõ ràng hơn nhiều so với các bộ dữ liệu còn lại, đó là \textbf{đánh đổi giữa chất lượng tái tạo và ngân sách tính toán trên block ảnh UAV thật}.
+
+\section{Đánh giá mức độ đã bị làm trước của hướng cũ}
+
+Đánh giá từ văn liệu gần đây cho thấy phần lớn ý tưởng trong proposal cũ đã có tiền lệ khá gần.
+
+Thứ nhất, benchmark chính thức trên UseGeo đã so sánh có hệ thống giữa offline MVS, online multi-view depth và single-image depth \citep{Hermann2024UseGeoEval}. Kết luận của nghiên cứu này đã rất rõ: mỗi họ phương pháp thắng ở một mặt, nhưng không có họ nào vừa nhanh vừa cho tái tạo 3D tốt đồng đều.
+
+Thứ hai, nhánh \textbf{monocular prior để cứu các trường hợp khó của photogrammetry} đang tiến rất nhanh. Trên photogrammetry overlap thấp, monocular depth đã được dùng để tạo metric depth và lấp khoảng trống mà pipeline truyền thống bỏ sót \citep{Zhong2025LowOverlap}. Ở phía computer vision tổng quát hơn, monocular depth đã được ghép trực tiếp với SfM để dẫn hướng multi-view reconstruction \citep{Guo2025SfMGuided}. Điều này làm cho câu chuyện ``monocular depth + pose + fusion'' không còn mới nếu chỉ thay đổi một vài chi tiết kỹ thuật.
+
+Thứ ba, các mô hình direct 3D reconstruction hiện đại như DUSt3R, MASt3R và VGGT cũng đã được mang thử lên các block ảnh aerial của UseGeo \citep{Wu2025AerialBlocks}. Kết quả cho thấy các mô hình học sâu trực tiếp có tiềm năng trong tình huống cực thưa, nhưng vẫn chưa thay thế được SfM/MVS cổ điển ở overlap quang trắc thông thường.
+
+Từ ba quan sát trên, có thể rút ra kết luận thẳng: \textbf{nếu tiếp tục theo hướng full-stack monocular metric depth rồi fuse toàn cục, novelty còn lại không cao}. Một đề tài mạnh hơn cần chuyển từ câu hỏi ``dựng depth thế nào'' sang câu hỏi ``phân bổ ngân sách tái tạo thế nào''.
+
+\section{Khoảng trống nghiên cứu hợp lý khi chỉ dùng UseGeo}
+
+Sau khi loại bỏ những hướng đã bị phủ quá gần, khoảng trống nghiên cứu còn lại hợp lý nhất nằm ở \textbf{bài toán phân bổ tính toán}.
+
+\subsection{Gap 1: văn liệu đánh giá nhiều phương pháp, nhưng ít nghiên cứu phân bổ ngân sách tinh chỉnh trên một block UAV cố định}
+
+Các nghiên cứu về SfM/MVS tập trung vào pair selection, scale, completeness hoặc accuracy \citep{Jiang2022Leveraging,Jiang2022Parallel,Liu2023Deep,Liao2024High,Jiang2024Efficient}. Các nghiên cứu về rapid mapping lại ưu tiên phản hồi nhanh ở mức bản đồ thô \citep{Campos2021ORB,Qin2018VINS,Liu2025ARTEMIS}. Nhưng với một \textbf{block ảnh đã cho trước}, câu hỏi ``nên chi ngân sách MVS đắt đỏ vào đâu trước'' vẫn chưa được đóng gói thành một bài toán nghiên cứu đủ rõ.
+
+\subsection{Gap 2: thiếu một bản đồ rủi ro tái tạo gắn trực tiếp với aerial image block}
+
+Trong ảnh UAV, vùng khó thường đến từ sự kết hợp của nhiều nguyên nhân: baseline yếu, texture thấp, bề mặt lặp lại, che khuất cục bộ, hoặc depth prior kém tin cậy. Các công trình về uncertainty trong dense stereo và MVS cho thấy confidence là quan trọng \citep{Li2020Confidence}, nhưng việc đưa nó thành \textbf{risk map ở mức block ảnh UAV} để điều tiết bước tinh chỉnh vẫn còn thiếu.
+
+\subsection{Gap 3: thiếu baseline một-dataset, công bằng về ngân sách tính toán}
+
+Nhiều bài hiện so trực tiếp chất lượng cuối giữa MVS, direct depth hay neural reconstruction \citep{Wei2024LiDeNeRF,Wu2025AerialBlocks}. Tuy nhiên, nếu mục tiêu là \textbf{triển khai thực dụng}, điều cần đo không chỉ là chất lượng cuối, mà là \textbf{chất lượng thu được trên mỗi đơn vị ngân sách tính toán}. Đây là góc nhìn hợp lý hơn cho một đề tài gọn và vẫn có ý nghĩa.
+
+\section{Đề xuất hướng nghiên cứu: RGSR-UseGeo}
+
+\subsection{Luận điểm}
+
+Hướng nghiên cứu được đề xuất là \textbf{RGSR-UseGeo} (\textit{Risk-Guided Selective Refinement for UseGeo}). Mục tiêu không còn là thiết kế một pipeline UAV toàn năng, mà là trả lời câu hỏi:
+
+\begin{quote}
+Với một block ảnh UAV cố định của UseGeo, có thể giữ lại bao nhiêu chất lượng tái tạo nếu chỉ tinh chỉnh đắt đỏ ở những phần được dự báo là rủi ro cao?
+\end{quote}
+
+\subsection{Kiến trúc phương pháp}
+
+\textbf{Bước A: tái tạo thô trên toàn bộ block.}
+Toàn bộ khung hình đều được đưa qua một bước depth/reconstruction thô, có thể là:
+\begin{enumerate}[leftmargin=1.5em]
+  \item monocular depth,
+  \item online multi-view depth nhẹ,
+  \item hoặc thậm chí depth proxy suy từ baseline truyền thống.
+\end{enumerate}
+Mục tiêu của bước này không phải tối đa hóa độ chính xác, mà là sinh một lớp hình học sơ bộ phủ toàn cảnh.
+
+\textbf{Bước B: ước lượng rủi ro tái tạo.}
+Với mỗi khung hình hoặc mỗi ô ảnh, xây dựng điểm rủi ro:
+\[
+R_i = \alpha B_i + \beta U_i + \gamma (1-T_i) + \delta V_i,
+\]
+trong đó:
+\begin{enumerate}[leftmargin=1.5em]
+  \item $B_i$ là độ thiếu hỗ trợ hình học từ láng giềng ảnh,
+  \item $U_i$ là bất định hoặc độ thiếu của depth sơ bộ,
+  \item $T_i$ là mức giàu texture,
+  \item $V_i$ là mức bất lợi về đa dạng góc nhìn.
+\end{enumerate}
+
+\textbf{Bước C: tinh chỉnh chọn lọc.}
+Chỉ các khung hình hoặc ô ảnh có $R_i$ cao nhất mới được đưa vào bước tinh chỉnh đắt đỏ hơn, chẳng hạn:
+\begin{enumerate}[leftmargin=1.5em]
+  \item MVS cục bộ,
+  \item refinement theo patch/tile,
+  \item hoặc fusion dày hơn với stride nhỏ hơn.
+\end{enumerate}
+
+\textbf{Bước D: hợp nhất đầu ra.}
+Hợp nhất tái tạo thô và phần tinh chỉnh chọn lọc để sinh:
+\begin{enumerate}[leftmargin=1.5em]
+  \item point cloud,
+  \item DSM hoặc height map,
+  \item và nếu cần thì mesh.
+\end{enumerate}
+
+\subsection{Điểm mới thực tế của hướng này}
+
+Điểm mới của hướng này không nằm ở bản thân monocular depth hay MVS, mà ở ba điểm sau:
+\begin{enumerate}[leftmargin=1.5em]
+  \item biến \textbf{rủi ro tái tạo} thành đối tượng tối ưu hóa chính;
+  \item đưa \textbf{ngân sách tính toán} vào định nghĩa bài toán thay vì chỉ so chất lượng cuối;
+  \item khóa toàn bộ đánh giá vào \textbf{một benchmark UAV thật có ground truth hình học}, giúp lập luận sạch hơn.
+\end{enumerate}
+
+Đây là novelty ở mức \textbf{vừa phải nhưng phòng thủ được}. Nó thực tế hơn nhiều so với việc tuyên bố một hệ UAV hợp nhất sẽ vượt trội trên mọi tiêu chí.
+
+\section{Triển khai hiện tại trong repo}
+
+Phần scaffold ban đầu đã được triển khai trong package mới \texttt{src/hawkbot\_uav\_usegeo}. Cấu trúc hiện tại bám trực tiếp theo hướng RGSR-UseGeo:
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Thành phần mã nguồn} & \textbf{Chức năng} \\
+\midrule
+\texttt{dataset.py} & dò cấu trúc UseGeo, đọc ảnh, pose, depth và chuẩn hóa thành danh sách frame \\
+\texttt{camera.py} & hình học camera cơ bản, back-projection depth sang point cloud \\
+\texttt{quick\_map.py} & tạo coverage map nhẹ và xuất \texttt{PGM + YAML} \\
+\texttt{risk.py} & tính điểm rủi ro cho từng frame từ geometry, texture và depth completeness \\
+\texttt{fusion.py} & selective fusion: toàn block dùng stride thô, top-$K$ frame rủi ro dùng stride dày hơn \\
+\texttt{pipeline.py} & điều phối toàn pipeline và lưu tổng kết ra \texttt{JSON/CSV/XYZ} \\
+\texttt{cli.py} & cung cấp ba lệnh: \texttt{summary}, \texttt{quick-map}, \texttt{reconstruct} \\
+\bottomrule
+\end{tabularx}
+\caption{Phần scaffold đã được cài trong repo để khởi động hướng RGSR-UseGeo.}
+\end{table}
+
+Hiện trạng triển khai này chưa phải là thuật toán nghiên cứu hoàn chỉnh. Nó là một \textbf{baseline thực nghiệm khả dụng} để:
+\begin{enumerate}[leftmargin=1.5em]
+  \item kiểm tra loader của UseGeo,
+  \item sinh quick coverage map,
+  \item xếp hạng frame theo rủi ro,
+  \item và chạy selective depth fusion trên ground-truth depth hoặc depth dự báo đã chuyển đổi.
+\end{enumerate}
+
+\section{Thiết kế thực nghiệm đề xuất}
+
+\subsection{Thiết lập dữ liệu}
+
+UseGeo có 3 block, nên cấu hình thực nghiệm hợp lý là:
+\begin{enumerate}[leftmargin=1.5em]
+  \item train hoặc tinh chỉnh trên 2 block,
+  \item test trên block còn lại,
+  \item xoay vòng theo kiểu leave-one-block-out.
+\end{enumerate}
+
+\subsection{Baseline nên so sánh}
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{MVS toàn phần}: COLMAP/OpenMVS hoặc một baseline trong benchmark UseGeo \citep{Hermann2024UseGeoEval};
+  \item \textbf{coarse-only}: chỉ dùng bước tái tạo thô trên toàn block;
+  \item \textbf{RGSR-UseGeo}: coarse + selective refinement;
+  \item \textbf{upper bound}: refinement dày cho toàn bộ frame.
+\end{enumerate}
+
+\subsection{Bộ đo}
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item depth: L1, accuracy, completeness theo protocol của UseGeo \citep{Hermann2024UseGeoEval};
+  \item point cloud: accuracy và completeness so với LiDAR;
+  \item hiệu năng: runtime, peak memory, số điểm sinh ra;
+  \item hiệu quả ngân sách: chất lượng trên mỗi giây xử lý hoặc trên mỗi triệu điểm được dựng.
+\end{enumerate}
+
+\subsection{Ablation}
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item có và không có texture term trong risk;
+  \item có và không có depth uncertainty/completeness term;
+  \item top-$K$ frame khác nhau;
+  \item stride thô và stride tinh chỉnh khác nhau;
+  \item frame-level refinement so với tile-level refinement.
+\end{enumerate}
+
+\section{Kết luận}
+
+Với ràng buộc \textbf{chỉ một dataset}, hướng nghiên cứu hợp lý nhất không còn là một hệ UAV toàn năng, mà là một bài toán hẹp hơn nhưng rõ hơn: \textbf{tái tạo chọn lọc có điều phối theo rủi ro trên UseGeo}. UseGeo là bộ dữ liệu phù hợp nhất vì nó đồng thời cung cấp ảnh UAV thật, ground-truth depth, pose và tham chiếu LiDAR \citep{Nex2024UseGeo}. Đồng thời, đánh giá văn liệu cho thấy phần lõi của proposal cũ đã bị phủ khá mạnh bởi benchmark UseGeo, monocular depth cho photogrammetry overlap thấp và các phương pháp direct 3D reconstruction gần đây \citep{Hermann2024UseGeoEval,Zhong2025LowOverlap,Guo2025SfMGuided,Wu2025AerialBlocks}. Vì vậy, RGSR-UseGeo là một sự thu hẹp cần thiết: ít phô trương hơn, dễ triển khai hơn, và trung thực hơn về novelty.
+
+Phần mã nguồn đi kèm đã hiện thực hóa bước đầu của hướng này trong repo, đủ để làm nền cho giai đoạn thực nghiệm tiếp theo.
+
+\nocite{Jiang2022Leveraging,Jiang2022Parallel,Ye2024coarse,Wu2024UAV,Shen2025Aerial,Lateef2025GPS,Wang2025VecMapLocNet,Wei2024LiDeNeRF,Yu2021Automatic,Xu2021Robust,Zheng2018multi,Wu2018Integration,Zhang2018patch,Liu2025ARTEMIS,Li2024Drone}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

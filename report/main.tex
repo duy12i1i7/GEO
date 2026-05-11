@@ -1,0 +1,260 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage[numbers,sort&compress]{natbib}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\setlength{\parskip}{0.6em}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.15}
+\urlstyle{same}
+
+\title{Dataset Survey and a Lean Research Direction for 2D/2.5D/3D Reconstruction from Sequential UAV Imagery under a Single-Dataset Constraint}
+\author{Prepared for the topic: reconstructing map products from consecutive UAV image sequences}
+\date{May 3, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report narrows the original UAV mapping problem to a more practical setting: \textbf{the entire project must run on one public dataset only}. After reviewing the currently accessible public UAV datasets, the report concludes that \textbf{UseGeo} is the best single-dataset choice when the main objective is image-based geometric reconstruction rather than localization or multi-sensor SLAM. The report also evaluates the earlier proposal critically and finds that a broad ``monocular depth + pose-guided fusion + uncertainty'' pipeline has already been covered too closely by recent work in photogrammetry, monocular-prior-guided reconstruction, and aerial-block benchmarking. The proposed replacement is therefore more focused: \textbf{RGSR-UseGeo} (\textit{Risk-Guided Selective Refinement for UseGeo}). The key idea is to reconstruct the full aerial block coarsely, estimate where the reconstruction is risky, and spend expensive refinement only on those high-risk regions or frames. The expected contribution is not a universal UAV world model, but a cleaner and more defensible research thesis: \textbf{compute-budget-aware aerial reconstruction on a real benchmark with geometric ground truth}. This is a more realistic scope for implementation and a more honest novelty claim.
+\end{abstract}
+
+\section{Context and Design Constraints}
+
+The original problem is straightforward to state: given a sequential UAV image set, estimate camera motion and produce useful 2D, 2.5D, or 3D map products. The technical background is already mature at the levels of UAV photogrammetry, structure from motion, dense matching, and georeferencing \citep{Colomina2014Unmanned,Zhao2014Direct,Jiang2017Efficient,Jiang2020Efficient}. However, once the project is constrained to \textbf{one dataset only}, the research question must change. A large systems proposal that simultaneously claims online mapping, dense reconstruction, semantics, uncertainty, and adaptive planning is no longer well matched to the available evidence.
+
+The reduced design therefore follows three explicit constraints:
+\begin{enumerate}[leftmargin=1.5em]
+  \item only one public dataset is used for the entire project;
+  \item the main focus is \textbf{image-based geometry}, not GNSS-denied localization or heavy multi-sensor fusion;
+  \item the method must remain compact enough to be scaffolded and tested in the current repository.
+\end{enumerate}
+
+\section{Current Public UAV Dataset Landscape}
+
+The public UAV dataset space that remains practically accessible in May 2026 can be grouped into four families:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{reconstruction and depth}: UseGeo, UAVStereo, and partially Dronescapes;
+  \item \textbf{video UAV perception with semantic/depth support}: UAVid and related variants;
+  \item \textbf{cross-view or localization-focused datasets}: UAV-VisLoc, AerialVL, ALTO;
+  \item \textbf{synthetic or strongly multi-sensor datasets}: Mid-Air, MUN-FRL, AgriLiRa4D, UAVScenes.
+\end{enumerate}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{1.8cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Dataset} & \textbf{Data type} & \textbf{Main strength} & \textbf{Weakness under a single-dataset project} \\
+\midrule
+UseGeo & UAV imagery + GT depth + poses + LiDAR & Directly supports depth, point cloud, mesh, and benchmarking & Small, only three blocks, not a rich semantic/video corpus \\
+UAVid & 4K UAV video + semantics + auxiliary depth & Strong for semantic segmentation and UAV video depth & Not a clean benchmark for survey-grade point clouds or meshes \\
+Dronescapes & UAV perception dataset & Useful for multi-task perception & Less standardized than UseGeo for dense geometry evaluation \\
+UAVStereo & Stereo/disparity & Good stereo benchmark & Too narrow for end-to-end mapping claims \\
+Mid-Air & Synthetic multi-modal & Excellent for debugging or pretraining & Unsuitable as the final benchmark \\
+UAV-VisLoc / AerialVL & Drone--satellite / cross-view & Strong for localization & Not centered on dense geometric reconstruction \\
+MUN-FRL / AgriLiRa4D & Camera + LiDAR + IMU + RTK & Strong SLAM datasets & Pull the project toward multi-sensor system design \\
+UAVScenes & Camera + LiDAR + semantic + pose & Rich modality coverage & Large scope, likely to broaden the thesis too much \\
+EuRoC MAV & Stereo + IMU indoor & Standard VIO benchmark & Not representative of outdoor UAV mapping \\
+\bottomrule
+\end{tabularx}
+\caption{Representative public UAV datasets still practically usable as of May 3, 2026, viewed through the lens of a strict one-dataset reconstruction project.}
+\end{table}
+
+\section{Why UseGeo Is the Best Single-Dataset Choice}
+
+\textbf{UseGeo} was explicitly introduced for rigorous evaluation of image-based 3D reconstruction from UAV imagery \citep{Nex2024UseGeo}. According to the official dataset description, it contains \textbf{829 images} across \textbf{three independent blocks}, with image resolution \textbf{7952$\times$5304}, plus \textbf{ground-truth depth}, \textbf{camera poses}, \textbf{LiDAR point clouds}, and \textbf{photogrammetric point clouds}. This combination is unusually favorable when a project is restricted to one dataset yet still needs to evaluate:
+\begin{enumerate}[leftmargin=1.5em]
+  \item depth quality,
+  \item point-cloud accuracy and completeness,
+  \item and downstream 3D reconstruction quality.
+\end{enumerate}
+
+Compared with video-centric or semantic-centric datasets, UseGeo offers two decisive advantages. First, it matches the target question directly: \textbf{geometric reconstruction from real UAV imagery}. Second, it already comes with a public evaluation protocol through a dedicated benchmark study and code release \citep{Hermann2024UseGeoEval}. That sharply reduces evaluation ambiguity.
+
+The practical consequence is simple: under a one-dataset constraint, UseGeo supports a much cleaner research question than the alternatives, namely the trade-off between \textbf{reconstruction quality and compute budget on a real aerial image block}.
+
+\section{How Much of the Earlier Solution Has Already Been Done?}
+
+Recent literature suggests that most of the earlier broad proposal is already covered too closely.
+
+First, the official UseGeo evaluation benchmark already compares offline MVS, online multi-view depth, and single-image depth in a common protocol \citep{Hermann2024UseGeoEval}. Its conclusions are already informative: each family wins on a different criterion, and no family simultaneously delivers strong dense 3D quality and low runtime.
+
+Second, the line of work that uses \textbf{monocular priors to rescue hard photogrammetric cases} is moving quickly. For low-overlap aerial photogrammetry, monocular depth has already been used to recover metric depth and improve scene completeness where traditional pipelines fail \citep{Zhong2025LowOverlap}. On the broader computer vision side, monocular depth has also been coupled directly with SfM-guided multi-view reconstruction \citep{Guo2025SfMGuided}. As a result, the thesis ``monocular depth + pose + fusion'' is no longer novel by itself.
+
+Third, recent direct 3D reconstruction models such as DUSt3R, MASt3R, and VGGT have already been evaluated on the aerial photogrammetric blocks of UseGeo \citep{Wu2025AerialBlocks}. Those results indicate that learning-based direct reconstruction can be useful in very sparse scenarios, but still does not cleanly replace classical SfM/MVS on standard photogrammetric overlap.
+
+The direct conclusion is therefore unavoidable: \textbf{a full-stack monocular metric-depth fusion proposal no longer has strong novelty under a single-dataset setup}. The research question needs to move from ``how to estimate depth everywhere'' toward ``how to allocate reconstruction effort intelligently''.
+
+\section{A More Defensible Research Gap under UseGeo}
+
+Once the over-broad components are removed, the most defensible gap becomes \textbf{compute allocation for dense aerial reconstruction}.
+
+\subsection{Gap 1: the literature evaluates many methods, but rarely studies refinement-budget allocation on a fixed aerial block}
+
+Classical SfM/MVS studies emphasize pair selection, scalability, completeness, or accuracy \citep{Jiang2022Leveraging,Jiang2022Parallel,Liu2023Deep,Liao2024High,Jiang2024Efficient}. Rapid mapping studies prioritize immediate situational awareness and lightweight mapping products \citep{Campos2021ORB,Qin2018VINS,Liu2025ARTEMIS}. However, for a \textbf{fixed aerial image block}, the question ``where should expensive refinement be spent first?'' remains much less clearly framed.
+
+\subsection{Gap 2: there is still no clean reconstruction-risk map tailored to aerial image blocks}
+
+Hard aerial regions typically arise from a combination of weak baselines, poor texture, repeated structures, local occlusion, or unreliable coarse depth. Confidence estimation is already known to matter in dense stereo and MVS \citep{Li2020Confidence}, but translating that idea into a \textbf{block-level reconstruction-risk signal} for aerial image blocks remains underdeveloped.
+
+\subsection{Gap 3: compute-aware single-dataset baselines are still rare}
+
+Many recent comparisons directly contrast final quality across MVS, monocular depth, or neural reconstruction \citep{Wei2024LiDeNeRF,Wu2025AerialBlocks}. For practical deployment, however, the relevant quantity is not only final quality, but also \textbf{quality per unit of compute budget}. That is a much tighter and more useful thesis for a one-dataset project.
+
+\section{Proposed Direction: RGSR-UseGeo}
+
+\subsection{Core Thesis}
+
+The proposed direction is \textbf{RGSR-UseGeo} (\textit{Risk-Guided Selective Refinement for UseGeo}). The method does not try to be a universal UAV world model. Instead, it asks:
+
+\begin{quote}
+For a fixed UAV image block in UseGeo, how much reconstruction quality can be preserved if expensive refinement is applied only to the regions or frames predicted to be risky?
+\end{quote}
+
+\subsection{Method Structure}
+
+\textbf{Step A: coarse reconstruction over the full block.}
+All frames receive a lightweight depth or reconstruction pass, for example:
+\begin{enumerate}[leftmargin=1.5em]
+  \item monocular depth,
+  \item lightweight multi-view depth,
+  \item or a coarse geometric proxy from conventional matching.
+\end{enumerate}
+The goal is not maximum accuracy, but full-scene geometric coverage.
+
+\textbf{Step B: reconstruction-risk estimation.}
+For each frame or tile, estimate:
+\[
+R_i = \alpha B_i + \beta U_i + \gamma (1-T_i) + \delta V_i,
+\]
+where:
+\begin{enumerate}[leftmargin=1.5em]
+  \item $B_i$ measures geometric support deficiency from neighboring views,
+  \item $U_i$ measures depth uncertainty or incompleteness,
+  \item $T_i$ measures texture richness,
+  \item $V_i$ penalizes unfavorable viewpoint diversity.
+\end{enumerate}
+
+\textbf{Step C: selective refinement.}
+Only the highest-risk frames or tiles are sent to an expensive refinement stage such as:
+\begin{enumerate}[leftmargin=1.5em]
+  \item local MVS,
+  \item patch/tile refinement,
+  \item or denser depth fusion with a smaller sampling stride.
+\end{enumerate}
+
+\textbf{Step D: final fusion.}
+Fuse the coarse reconstruction and the selectively refined outputs into:
+\begin{enumerate}[leftmargin=1.5em]
+  \item a point cloud,
+  \item a DSM or height map,
+  \item and optionally a mesh.
+\end{enumerate}
+
+\subsection{Why This Is a Better Novelty Claim}
+
+The novelty is not monocular depth, not MVS, and not uncertainty in isolation. The contribution is the explicit formulation of:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{reconstruction risk} as the object to optimize,
+  \item \textbf{compute budget} as part of the problem definition,
+  \item and a \textbf{single-dataset, geometry-grounded benchmark thesis} that can be evaluated cleanly.
+\end{enumerate}
+
+This is a moderate but defensible novelty target. It is substantially more realistic than claiming a single unified UAV system that dominates every baseline on every axis.
+
+\section{Implementation Already Added to the Repository}
+
+An initial scaffold aligned with RGSR-UseGeo has already been added as \texttt{src/hawkbot\_uav\_usegeo}. The implementation mirrors the reduced thesis directly:
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.1cm} >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Source component} & \textbf{Role} \\
+\midrule
+\texttt{dataset.py} & discovers a UseGeo-style layout and parses frames, poses, and optional depth maps \\
+\texttt{camera.py} & basic camera geometry and depth back-projection \\
+\texttt{quick\_map.py} & builds a lightweight coverage map and exports \texttt{PGM + YAML} \\
+\texttt{risk.py} & computes per-frame risk from geometry, texture, and depth completeness \\
+\texttt{fusion.py} & selective fusion baseline: coarse stride for all frames, denser stride for top-$K$ risky frames \\
+\texttt{pipeline.py} & orchestrates the end-to-end baseline and exports \texttt{JSON/CSV/XYZ} summaries \\
+\texttt{cli.py} & exposes three commands: \texttt{summary}, \texttt{quick-map}, and \texttt{reconstruct} \\
+\bottomrule
+\end{tabularx}
+\caption{Implemented scaffold for the reduced RGSR-UseGeo direction.}
+\end{table}
+
+The current code is not a final research method. It is a \textbf{working experimental baseline} that is already sufficient to:
+\begin{enumerate}[leftmargin=1.5em]
+  \item validate UseGeo loading,
+  \item generate a quick coverage map,
+  \item rank frames by reconstruction risk,
+  \item and run selective point-cloud fusion on ground-truth or converted predicted depth.
+\end{enumerate}
+
+\section{Proposed Experimental Protocol}
+
+\subsection{Data split}
+
+Because UseGeo contains three independent blocks, a natural evaluation setup is:
+\begin{enumerate}[leftmargin=1.5em]
+  \item train or tune on two blocks,
+  \item test on the remaining block,
+  \item rotate in a leave-one-block-out manner.
+\end{enumerate}
+
+\subsection{Baselines}
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{full MVS}: COLMAP/OpenMVS or another benchmarked UseGeo baseline \citep{Hermann2024UseGeoEval};
+  \item \textbf{coarse-only}: lightweight reconstruction over all frames;
+  \item \textbf{RGSR-UseGeo}: coarse pass + selective refinement;
+  \item \textbf{upper bound}: dense refinement over all frames.
+\end{enumerate}
+
+\subsection{Metrics}
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item depth: L1, accuracy, completeness using the UseGeo protocol \citep{Hermann2024UseGeoEval};
+  \item point cloud: accuracy and completeness against LiDAR;
+  \item efficiency: runtime, peak memory, number of reconstructed points;
+  \item budget efficiency: quality per second of processing or per million reconstructed points.
+\end{enumerate}
+
+\subsection{Ablations}
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item with and without the texture term in the risk score;
+  \item with and without the depth uncertainty/completeness term;
+  \item different values of top-$K$ risky frames;
+  \item different coarse and refine strides;
+  \item frame-level refinement versus tile-level refinement.
+\end{enumerate}
+
+\section{Conclusion}
+
+Under a strict \textbf{single-dataset} constraint, the most suitable direction is no longer a universal UAV mapping system, but a more compact thesis: \textbf{risk-guided selective reconstruction on UseGeo}. UseGeo is the best choice because it simultaneously provides real UAV imagery, ground-truth depth, camera poses, and LiDAR reference geometry \citep{Nex2024UseGeo}. At the same time, the literature indicates that the earlier broad proposal has already been covered too closely by UseGeo benchmarking, monocular-depth-based low-overlap photogrammetry, and recent direct 3D reconstruction evaluations \citep{Hermann2024UseGeoEval,Zhong2025LowOverlap,Guo2025SfMGuided,Wu2025AerialBlocks}. RGSR-UseGeo is therefore a necessary narrowing: less overstated, easier to implement, and more honest about novelty.
+
+The repository now includes a first implementation scaffold for this reduced direction, which is sufficient to support the next experimental phase.
+
+\nocite{Jiang2022Leveraging,Jiang2022Parallel,Ye2024coarse,Wu2024UAV,Shen2025Aerial,Lateef2025GPS,Wang2025VecMapLocNet,Wei2024LiDeNeRF,Yu2021Automatic,Xu2021Robust,Zheng2018multi,Wu2018Integration,Zhang2018patch,Liu2025ARTEMIS,Li2024Drone}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

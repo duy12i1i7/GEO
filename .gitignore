@@ -1,0 +1,39 @@
+# Build artifacts
+build/
+install/
+__pycache__/
+*.pyc
+*.egg-info/
+.idea/
+.venv-uav-usegeo/
+.micromamba/
+.external/
+demo_data/
+demo_output/
+output/hawkbot_uav_usegeo/odm_fix_*/
+DensifyPointCloud-*.log
+InterfaceCOLMAP-*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.xdv
+
+# Binary (use HBSDK.py instead)
+*.so
+
+# Large binary files (download separately)
+*.dat
+*.bag
+Hawkbot_ROS_Control/ROS_Control
+Hawkbot_ROS_Control/libSkiaSharp.so
+Hawkbot_ROS_Control/libHarfBuzzSharp.so
