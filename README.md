@@ -42,9 +42,17 @@ Lệnh này sẽ:
 
 ## Ubuntu + NVIDIA
 
-Trên Ubuntu có GPU NVIDIA, không nên dùng bootstrap macOS ở
-[scripts/bootstrap_geo_uav_recon_full.sh](/Users/udy/GEO-repo/scripts/bootstrap_geo_uav_recon_full.sh).
-Thay vào đó dùng script riêng:
+`run_geo_project.sh` giờ đã tự nhận biết Ubuntu và dùng bootstrap phù hợp. Cách đơn giản nhất là chạy thẳng:
+
+```bash
+cd ~/GEO-repo
+./run_geo_project.sh \
+  --coarse-device cuda \
+  --refine-device cuda \
+  --batch-size 4
+```
+
+Nếu muốn bootstrap riêng trước:
 
 ```bash
 cd ~/GEO-repo
@@ -52,7 +60,7 @@ chmod +x scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
 ./scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
 ```
 
-Sau khi bootstrap xong:
+Sau khi bootstrap riêng xong, có thể chạy lại bằng interpreter cố định:
 
 ```bash
 ~/GEO-repo/run_geo_project.sh \

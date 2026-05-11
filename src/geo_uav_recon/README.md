@@ -27,7 +27,17 @@ Luồng `full` sẽ:
 
 ## Ubuntu + NVIDIA
 
-Script bootstrap khuyến nghị:
+`run_geo_project.sh` hiện có thể tự bootstrap trên Ubuntu:
+
+```bash
+cd ~/GEO-repo
+./run_geo_project.sh \
+  --coarse-device cuda \
+  --refine-device cuda \
+  --batch-size 4
+```
+
+Muốn bootstrap riêng trước thì dùng:
 
 ```bash
 cd ~/GEO-repo

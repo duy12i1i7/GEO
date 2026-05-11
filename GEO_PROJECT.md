@@ -59,7 +59,17 @@ Chế độ nhanh:
 
 ## Ubuntu + NVIDIA
 
-Repo đã có bootstrap riêng cho Ubuntu + NVIDIA:
+`run_geo_project.sh` hiện đã tự nhận biết Ubuntu và gọi đúng bootstrap:
+
+```bash
+cd ~/GEO-repo
+./run_geo_project.sh \
+  --coarse-device cuda \
+  --refine-device cuda \
+  --batch-size 4
+```
+
+Repo vẫn có bootstrap riêng nếu muốn chuẩn bị môi trường trước:
 
 - [scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh](/Users/udy/GEO-repo/scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh)
 

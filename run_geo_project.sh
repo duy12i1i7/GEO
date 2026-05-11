@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_ROOT="$ROOT_DIR/data/geo_uav_recon"
 OUTPUT_ROOT="$ROOT_DIR/output/geo_uav_recon"
 MODE="full"
+BOOTSTRAP_VARIANT="${BOOTSTRAP_VARIANT:-auto}"
 ODM_ROOTS=()
 ODM_OUTPUT_ROOT=""
 ODM_SAMPLE_NAME="mygla"
@@ -36,6 +37,73 @@ DRONESCAPES_START_INDEX=0
 DRONESCAPES_SCENE_PREFIXES=()
 OUTPUT_DIR="$OUTPUT_ROOT/ready_run"
 CONFIG_PATH="$OUTPUT_DIR/benchmark_real.json"
+MACOS_ENV_PY="$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python"
+UBUNTU_ENV_PY="$ROOT_DIR/.venv-geo-uav-recon/bin/python"
+
+resolve_bootstrap_variant() {
+  if [[ "$BOOTSTRAP_VARIANT" != "auto" ]]; then
+    printf '%s\n' "$BOOTSTRAP_VARIANT"
+    return 0
+  fi
+
+  case "$(uname -s)" in
+    Darwin)
+      printf 'macos\n'
+      return 0
+      ;;
+    Linux)
+      if [[ -f /etc/os-release ]]; then
+        # /etc/os-release is shell-compatible and intended to be sourced by scripts.
+        # See os-release(5): https://man7.org/linux/man-pages/man5/os-release.5.html
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        if [[ "${ID:-}" == "ubuntu" || "${ID_LIKE:-}" == *"ubuntu"* || "${ID_LIKE:-}" == *"debian"* ]]; then
+          printf 'ubuntu_cuda\n'
+          return 0
+        fi
+      fi
+      ;;
+  esac
+
+  printf 'unsupported\n'
+}
+
+bootstrap_script_for_variant() {
+  case "$1" in
+    macos) printf '%s\n' "$ROOT_DIR/scripts/bootstrap_geo_uav_recon_full.sh" ;;
+    ubuntu_cuda) printf '%s\n' "$ROOT_DIR/scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh" ;;
+    *) return 1 ;;
+  esac
+}
+
+default_python_for_variant() {
+  case "$1" in
+    macos) printf '%s\n' "$MACOS_ENV_PY" ;;
+    ubuntu_cuda) printf '%s\n' "$UBUNTU_ENV_PY" ;;
+    *) return 1 ;;
+  esac
+}
+
+run_bootstrap_for_variant() {
+  local variant="$1"
+  local script_path="$2"
+  case "$variant" in
+    macos)
+      if [[ "$MODE" == "full" || ${#ODM_ROOTS[@]} -gt 0 || -n "$ODM_OUTPUT_ROOT" || -n "$ODM_BENCHMARK_SUITE" ]]; then
+        WITH_OPENMVS=1 "$script_path"
+      else
+        WITH_OPENMVS=0 "$script_path"
+      fi
+      ;;
+    ubuntu_cuda)
+      "$script_path"
+      ;;
+    *)
+      printf 'Unsupported bootstrap variant: %s\n' "$variant" >&2
+      return 1
+      ;;
+  esac
+}
 
 usage() {
   cat <<EOF
@@ -49,6 +117,7 @@ Modes:
 
 Options:
   --mode <quick|full>
+  --bootstrap-variant <auto|macos|ubuntu_cuda>
   --odm-root <path>                    Repeatable
   --odm-output-root <path>
   --odm-sample-name <name>
@@ -86,6 +155,7 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --mode) MODE="$2"; shift 2 ;;
+    --bootstrap-variant) BOOTSTRAP_VARIANT="$2"; shift 2 ;;
     --odm-root) ODM_ROOTS+=("$2"); shift 2 ;;
     --odm-output-root) ODM_OUTPUT_ROOT="$2"; shift 2 ;;
     --odm-sample-name) ODM_SAMPLE_NAME="$2"; shift 2 ;;
@@ -141,8 +211,10 @@ if [[ -n "$DRONESCAPES_ROOT" && -n "$DRONESCAPES_BENCHMARK_SUITE" ]]; then
 fi
 
 if [[ -z "$PYTHON_BIN" ]]; then
-  if [[ -x "$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python" ]]; then
-    PYTHON_BIN="$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python"
+  if [[ -x "$UBUNTU_ENV_PY" ]]; then
+    PYTHON_BIN="$UBUNTU_ENV_PY"
+  elif [[ -x "$MACOS_ENV_PY" ]]; then
+    PYTHON_BIN="$MACOS_ENV_PY"
   else
     PYTHON_BIN="python3"
   fi
@@ -153,13 +225,29 @@ if [[ ! -x "$PYTHON_BIN" && "$PYTHON_BIN" != "python3" ]]; then
   exit 1
 fi
 
-if [[ ! -x "$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python" && "$AUTO_BOOTSTRAP" == "1" ]]; then
-  if [[ "$MODE" == "full" || ${#ODM_ROOTS[@]} -gt 0 || -n "$ODM_OUTPUT_ROOT" || -n "$ODM_BENCHMARK_SUITE" ]]; then
-    WITH_OPENMVS=1 "$ROOT_DIR/scripts/bootstrap_geo_uav_recon_full.sh"
-  else
-    WITH_OPENMVS=0 "$ROOT_DIR/scripts/bootstrap_geo_uav_recon_full.sh"
+BOOTSTRAP_VARIANT_RESOLVED="$(resolve_bootstrap_variant)"
+if [[ "$BOOTSTRAP_VARIANT_RESOLVED" != "macos" && "$BOOTSTRAP_VARIANT_RESOLVED" != "ubuntu_cuda" && "$BOOTSTRAP_VARIANT_RESOLVED" != "unsupported" ]]; then
+  printf 'Unsupported bootstrap variant: %s\n' "$BOOTSTRAP_VARIANT_RESOLVED" >&2
+  exit 2
+fi
+if [[ "$BOOTSTRAP_VARIANT_RESOLVED" == "unsupported" && "$AUTO_BOOTSTRAP" == "1" ]]; then
+  printf 'Automatic bootstrap is not supported on this OS. Set --no-bootstrap and prepare the environment manually, or pass --bootstrap-variant explicitly.\n' >&2
+  exit 1
+fi
+
+if [[ "$BOOTSTRAP_VARIANT_RESOLVED" != "unsupported" ]]; then
+  BOOTSTRAP_SCRIPT="$(bootstrap_script_for_variant "$BOOTSTRAP_VARIANT_RESOLVED")"
+  BOOTSTRAP_ENV_PY="$(default_python_for_variant "$BOOTSTRAP_VARIANT_RESOLVED")"
+else
+  BOOTSTRAP_SCRIPT=""
+  BOOTSTRAP_ENV_PY=""
+fi
+
+if [[ -n "$BOOTSTRAP_ENV_PY" && ! -x "$BOOTSTRAP_ENV_PY" && "$AUTO_BOOTSTRAP" == "1" ]]; then
+  run_bootstrap_for_variant "$BOOTSTRAP_VARIANT_RESOLVED" "$BOOTSTRAP_SCRIPT"
+  if [[ -x "$BOOTSTRAP_ENV_PY" ]]; then
+    PYTHON_BIN="$BOOTSTRAP_ENV_PY"
   fi
-  PYTHON_BIN="$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python"
 fi
 
 if [[ "$MODE" == "full" ]]; then
@@ -182,8 +270,14 @@ fi
 
 if [[ "$AUTO_BOOTSTRAP" == "1" && "$MODE" == "full" ]]; then
   if [[ ! -x "$ROOT_DIR/.external/openMVS_build/bin/InterfaceCOLMAP" || ! -x "$ROOT_DIR/.external/openMVS_build/bin/DensifyPointCloud" ]]; then
-    WITH_OPENMVS=1 "$ROOT_DIR/scripts/bootstrap_geo_uav_recon_full.sh"
-    PYTHON_BIN="$ROOT_DIR/.micromamba/envs/geo-uav-recon-full/bin/python"
+    if [[ "$BOOTSTRAP_VARIANT_RESOLVED" == "unsupported" ]]; then
+      printf 'OpenMVS binaries are missing and automatic bootstrap is unsupported on this OS.\n' >&2
+      exit 1
+    fi
+    run_bootstrap_for_variant "$BOOTSTRAP_VARIANT_RESOLVED" "$BOOTSTRAP_SCRIPT"
+    if [[ -x "$BOOTSTRAP_ENV_PY" ]]; then
+      PYTHON_BIN="$BOOTSTRAP_ENV_PY"
+    fi
   fi
 fi
 
