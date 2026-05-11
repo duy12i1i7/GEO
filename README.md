@@ -40,6 +40,36 @@ Lệnh này sẽ:
 - chạy benchmark end-to-end
 - xuất report HTML, JSON, CSV
 
+## Ubuntu + NVIDIA
+
+Trên Ubuntu có GPU NVIDIA, không nên dùng bootstrap macOS ở
+[scripts/bootstrap_geo_uav_recon_full.sh](/Users/udy/GEO-repo/scripts/bootstrap_geo_uav_recon_full.sh).
+Thay vào đó dùng script riêng:
+
+```bash
+cd ~/GEO-repo
+chmod +x scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
+./scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
+```
+
+Sau khi bootstrap xong:
+
+```bash
+~/GEO-repo/run_geo_project.sh \
+  --no-bootstrap \
+  --python-bin ~/GEO-repo/.venv-geo-uav-recon/bin/python \
+  --coarse-device cuda \
+  --refine-device cuda \
+  --batch-size 4
+```
+
+Nếu cần đổi CUDA wheel, đặt:
+
+```bash
+TORCH_INDEX_URL=https://download.pytorch.org/whl/cu121 \
+./scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
+```
+
 Chế độ nhẹ để kiểm tra nhanh:
 
 ```bash

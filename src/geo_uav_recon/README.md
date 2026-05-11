@@ -25,6 +25,26 @@ Luồng `full` sẽ:
   - `MASt3R`
   - `risk_hybrid_real`
 
+## Ubuntu + NVIDIA
+
+Script bootstrap khuyến nghị:
+
+```bash
+cd ~/GEO-repo
+./scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
+```
+
+Sau đó chạy:
+
+```bash
+/Users/udy/GEO-repo/run_geo_project.sh \
+  --no-bootstrap \
+  --python-bin /Users/udy/GEO-repo/.venv-geo-uav-recon/bin/python \
+  --coarse-device cuda \
+  --refine-device cuda \
+  --batch-size 4
+```
+
 Mặc định `full` dùng:
 
 - `ODMData`: suite `recommended`

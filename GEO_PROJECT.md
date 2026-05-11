@@ -57,6 +57,25 @@ Chế độ nhanh:
 /Users/udy/GEO-repo/run_geo_project.sh --mode quick
 ```
 
+## Ubuntu + NVIDIA
+
+Repo đã có bootstrap riêng cho Ubuntu + NVIDIA:
+
+- [scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh](/Users/udy/GEO-repo/scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh)
+
+Luồng khuyến nghị:
+
+```bash
+cd ~/GEO-repo
+./scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
+~/GEO-repo/run_geo_project.sh \
+  --no-bootstrap \
+  --python-bin ~/GEO-repo/.venv-geo-uav-recon/bin/python \
+  --coarse-device cuda \
+  --refine-device cuda \
+  --batch-size 4
+```
+
 Chạy lớn hơn trên máy mạnh:
 
 ```bash
