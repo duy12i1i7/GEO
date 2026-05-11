@@ -32,6 +32,9 @@ COARSE_DEVICE="cpu"
 REFINE_DEVICE="cpu"
 WINDOW_SIZE=2
 BATCH_SIZE=1
+THERMAL_SAFE=0
+CPU_THREADS=""
+BUILD_JOBS=""
 DRONESCAPES_MAX_FRAMES=0
 DRONESCAPES_START_INDEX=0
 DRONESCAPES_SCENE_PREFIXES=()
@@ -144,6 +147,9 @@ Options:
   --refine-device <cpu|cuda>
   --window-size <int>
   --batch-size <int>
+  --thermal-safe
+  --cpu-threads <int>
+  --build-jobs <int>
   --dronescapes-max-frames <int>
   --dronescapes-start-index <int>
   --dronescapes-scene-prefix <prefix>   Repeatable
@@ -182,6 +188,9 @@ while [[ $# -gt 0 ]]; do
     --refine-device) REFINE_DEVICE="$2"; shift 2 ;;
     --window-size) WINDOW_SIZE="$2"; shift 2 ;;
     --batch-size) BATCH_SIZE="$2"; shift 2 ;;
+    --thermal-safe) THERMAL_SAFE=1; shift 1 ;;
+    --cpu-threads) CPU_THREADS="$2"; shift 2 ;;
+    --build-jobs) BUILD_JOBS="$2"; shift 2 ;;
     --dronescapes-max-frames) DRONESCAPES_MAX_FRAMES="$2"; shift 2 ;;
     --dronescapes-start-index) DRONESCAPES_START_INDEX="$2"; shift 2 ;;
     --dronescapes-scene-prefix) DRONESCAPES_SCENE_PREFIXES+=("$2"); shift 2 ;;
@@ -194,10 +203,47 @@ done
 
 mkdir -p "$DATA_ROOT" "$OUTPUT_ROOT"
 
+resolve_default_jobs() {
+  local detected
+  if command -v nproc >/dev/null 2>&1; then
+    detected="$(nproc)"
+  else
+    detected="$(sysctl -n hw.ncpu 2>/dev/null || printf '4\n')"
+  fi
+  if [[ "$detected" -gt 4 ]]; then
+    detected=4
+  fi
+  printf '%s\n' "$detected"
+}
+
 if [[ "$MODE" != "quick" && "$MODE" != "full" ]]; then
   printf 'Unsupported mode: %s\n' "$MODE" >&2
   usage >&2
   exit 2
+fi
+
+if [[ "$THERMAL_SAFE" == "1" ]]; then
+  [[ -z "$CPU_THREADS" ]] && CPU_THREADS="$(resolve_default_jobs)"
+  [[ -z "$BUILD_JOBS" ]] && BUILD_JOBS="$(resolve_default_jobs)"
+fi
+
+if [[ -n "$CPU_THREADS" ]]; then
+  export GEO_UAV_RECON_CPU_THREADS="$CPU_THREADS"
+  export OMP_NUM_THREADS="$CPU_THREADS"
+  export OPENBLAS_NUM_THREADS="$CPU_THREADS"
+  export MKL_NUM_THREADS="$CPU_THREADS"
+  export NUMEXPR_NUM_THREADS="$CPU_THREADS"
+  export VECLIB_MAXIMUM_THREADS="$CPU_THREADS"
+fi
+
+if [[ -n "$BUILD_JOBS" ]]; then
+  export BUILD_JOBS
+  export CMAKE_BUILD_PARALLEL_LEVEL="$BUILD_JOBS"
+fi
+
+if [[ "$THERMAL_SAFE" == "1" ]]; then
+  export GEO_THERMAL_SAFE=1
+  export THERMAL_SAFE=1
 fi
 
 if [[ ${#ODM_ROOTS[@]} -gt 0 && -n "$ODM_BENCHMARK_SUITE" ]]; then

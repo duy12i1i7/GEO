@@ -10,6 +10,8 @@ WITH_APT="${WITH_APT:-1}"
 WITH_COLMAP="${WITH_COLMAP:-1}"
 WITH_OPENMVS="${WITH_OPENMVS:-1}"
 USE_SUDO="${USE_SUDO:-1}"
+THERMAL_SAFE="${THERMAL_SAFE:-0}"
+BUILD_JOBS="${BUILD_JOBS:-}"
 VCPKG_ROOT="${VCPKG_ROOT:-$ROOT_DIR/.external/vcpkg}"
 APT_INSTALL="apt-get install -y"
 APT_UPDATE="apt-get update"
@@ -31,6 +33,21 @@ require_cmd() {
     printf 'Missing required command: %s\n' "$1" >&2
     exit 1
   }
+}
+
+resolve_build_jobs() {
+  if [[ -n "$BUILD_JOBS" ]]; then
+    printf '%s\n' "$BUILD_JOBS"
+    return 0
+  fi
+  local detected
+  detected="$(nproc)"
+  if [[ "$THERMAL_SAFE" == "1" ]]; then
+    if [[ "$detected" -gt 4 ]]; then
+      detected=4
+    fi
+  fi
+  printf '%s\n' "$detected"
 }
 
 clone_or_update_repo() {
@@ -71,6 +88,8 @@ build_openmvs() {
   local triplet_path="$overlay_triplets_dir/$vcpkg_triplet.cmake"
   local host_triplet_path="$overlay_triplets_dir/$vcpkg_host_triplet.cmake"
   local openmvs_use_cuda="OFF"
+  local build_jobs
+  build_jobs="$(resolve_build_jobs)"
   if [[ "$(uname -m)" == "aarch64" || "$(uname -m)" == "arm64" ]]; then
     vcpkg_triplet="arm64-linux-geo-release"
     vcpkg_host_triplet="arm64-linux"
@@ -148,7 +167,7 @@ EOF
     -DOpenMVS_USE_PYTHON=OFF \
     -DOpenMVS_USE_SIFTGPU=OFF
   log "building OpenMVS"
-  cmake --build "$openmvs_build" -j"$(nproc)"
+  cmake --build "$openmvs_build" -j"$build_jobs"
 }
 
 log "project root: $ROOT_DIR"

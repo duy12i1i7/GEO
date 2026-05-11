@@ -8,6 +8,38 @@ OUTPUT_DIR=""
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 COLMAP_BIN="${COLMAP_BIN:-$(command -v colmap || true)}"
 OPENMVS_BIN_DIR="${OPENMVS_BIN_DIR:-$ROOT_DIR/.external/openMVS_build/bin}"
+THERMAL_SAFE="${THERMAL_SAFE:-${GEO_THERMAL_SAFE:-0}}"
+CPU_THREADS="${CPU_THREADS:-${GEO_UAV_RECON_CPU_THREADS:-}}"
+NICE_LEVEL="${NICE_LEVEL:-10}"
+
+resolve_cpu_threads() {
+  if [[ -n "$CPU_THREADS" ]]; then
+    printf '%s\n' "$CPU_THREADS"
+    return 0
+  fi
+  local detected
+  if command -v nproc >/dev/null 2>&1; then
+    detected="$(nproc)"
+  else
+    detected=4
+  fi
+  if [[ "$THERMAL_SAFE" == "1" && "$detected" -gt 4 ]]; then
+    detected=4
+  fi
+  printf '%s\n' "$detected"
+}
+
+run_maybe_cool() {
+  if [[ "$THERMAL_SAFE" == "1" ]]; then
+    if command -v ionice >/dev/null 2>&1; then
+      ionice -c2 -n7 nice -n "$NICE_LEVEL" "$@"
+    else
+      nice -n "$NICE_LEVEL" "$@"
+    fi
+  else
+    "$@"
+  fi
+}
 
 usage() {
   cat <<EOF
@@ -79,6 +111,11 @@ if [[ ! -x "$INTERFACE_COLMAP" || ! -x "$DENSIFY_POINT_CLOUD" ]]; then
 fi
 
 export PYTHONPATH="$ROOT_DIR/src/geo_uav_recon${PYTHONPATH:+:$PYTHONPATH}"
+CPU_THREADS_RESOLVED="$(resolve_cpu_threads)"
+export OMP_NUM_THREADS="$CPU_THREADS_RESOLVED"
+export OPENBLAS_NUM_THREADS="$CPU_THREADS_RESOLVED"
+export MKL_NUM_THREADS="$CPU_THREADS_RESOLVED"
+export NUMEXPR_NUM_THREADS="$CPU_THREADS_RESOLVED"
 
 IMAGE_DIR="$("$PYTHON_BIN" - "$DATASET_KIND" "$DATASET_ROOT" <<'PY'
 import sys
@@ -110,7 +147,7 @@ DATABASE_PATH="$COLMAP_WORKSPACE/database.db"
 
 START_SEC="$("$PYTHON_BIN" -c 'import time; print(time.perf_counter())')"
 
-"$COLMAP_BIN" feature_extractor \
+run_maybe_cool "$COLMAP_BIN" feature_extractor \
   --database_path "$DATABASE_PATH" \
   --image_path "$IMAGE_DIR" \
   --ImageReader.single_camera 1 \
@@ -118,11 +155,11 @@ START_SEC="$("$PYTHON_BIN" -c 'import time; print(time.perf_counter())')"
   --FeatureExtraction.use_gpu 0 \
   --SiftExtraction.max_num_features 12000
 
-"$COLMAP_BIN" exhaustive_matcher \
+run_maybe_cool "$COLMAP_BIN" exhaustive_matcher \
   --database_path "$DATABASE_PATH" \
   --FeatureMatching.use_gpu 0
 
-"$COLMAP_BIN" mapper \
+run_maybe_cool "$COLMAP_BIN" mapper \
   --database_path "$DATABASE_PATH" \
   --image_path "$IMAGE_DIR" \
   --output_path "$COLMAP_SPARSE" \
@@ -135,7 +172,7 @@ if [[ ! -d "$COLMAP_SPARSE/0" ]]; then
   exit 1
 fi
 
-"$COLMAP_BIN" image_undistorter \
+run_maybe_cool "$COLMAP_BIN" image_undistorter \
   --image_path "$IMAGE_DIR" \
   --input_path "$COLMAP_SPARSE/0" \
   --output_path "$COLMAP_DENSE" \
@@ -143,12 +180,12 @@ fi
 
 (
   cd "$OPENMVS_WORKSPACE"
-  "$INTERFACE_COLMAP" \
+  run_maybe_cool "$INTERFACE_COLMAP" \
     -i "$COLMAP_DENSE" \
     -o scene.mvs \
     --image-folder "$COLMAP_DENSE/images"
 
-  "$DENSIFY_POINT_CLOUD" \
+  run_maybe_cool "$DENSIFY_POINT_CLOUD" \
     scene.mvs \
     --resolution-level 1 \
     --estimate-colors 2 \

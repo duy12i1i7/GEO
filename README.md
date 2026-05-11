@@ -80,6 +80,24 @@ TORCH_INDEX_URL=https://download.pytorch.org/whl/cu121 \
 
 Trên Ubuntu 24.04, script này mặc định dùng `python3` của hệ thống, tức thường là Python 3.12.
 
+Nếu máy dễ sập vì nhiệt nhưng vẫn muốn chạy `full`, dùng thermal-safe mode:
+
+```bash
+cd ~/GEO-repo
+./run_geo_project.sh \
+  --thermal-safe \
+  --cpu-threads 4 \
+  --build-jobs 4 \
+  --coarse-device cuda \
+  --refine-device cuda \
+  --batch-size 4
+```
+
+Ý nghĩa:
+- giữ full benchmark như cũ
+- giới hạn compile `OpenMVS` và runtime CPU-heavy về `4` luồng
+- chạy photogrammetry với `nice`/`ionice` khi có trên Linux
+
 Chế độ nhẹ để kiểm tra nhanh:
 
 ```bash
