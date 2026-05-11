@@ -60,6 +60,17 @@ chmod +x scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
 ./scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
 ```
 
+Script bootstrap Ubuntu hiện mặc định chạy ở chế độ thermal-safe:
+- hạ mức ưu tiên CPU/I/O với `nice` và `ionice` nếu có
+- giới hạn build jobs xuống tối đa `4` nếu bạn không override
+- giảm tải cho các bước nặng như `vcpkg`, `OpenMVS`, và cài Python packages
+
+Nếu muốn ép chặt hơn:
+
+```bash
+THERMAL_SAFE=1 BUILD_JOBS=2 ./scripts/bootstrap_geo_uav_recon_ubuntu_cuda.sh
+```
+
 Sau khi bootstrap riêng xong, có thể chạy lại bằng interpreter cố định:
 
 ```bash

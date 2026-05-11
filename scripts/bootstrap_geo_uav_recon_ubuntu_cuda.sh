@@ -10,14 +10,27 @@ WITH_APT="${WITH_APT:-1}"
 WITH_COLMAP="${WITH_COLMAP:-1}"
 WITH_OPENMVS="${WITH_OPENMVS:-1}"
 USE_SUDO="${USE_SUDO:-1}"
-THERMAL_SAFE="${THERMAL_SAFE:-0}"
+THERMAL_SAFE="${THERMAL_SAFE:-1}"
 BUILD_JOBS="${BUILD_JOBS:-}"
+NICE_LEVEL="${NICE_LEVEL:-10}"
 VCPKG_ROOT="${VCPKG_ROOT:-$ROOT_DIR/.external/vcpkg}"
 APT_INSTALL="apt-get install -y"
 APT_UPDATE="apt-get update"
 
 log() {
   printf '[bootstrap-ubuntu-cuda] %s\n' "$1"
+}
+
+run_cool() {
+  if [[ "$THERMAL_SAFE" == "1" ]]; then
+    if command -v ionice >/dev/null 2>&1; then
+      ionice -c2 -n7 nice -n "$NICE_LEVEL" "$@"
+    else
+      nice -n "$NICE_LEVEL" "$@"
+    fi
+  else
+    "$@"
+  fi
 }
 
 run_root() {
@@ -90,6 +103,11 @@ build_openmvs() {
   local openmvs_use_cuda="OFF"
   local build_jobs
   build_jobs="$(resolve_build_jobs)"
+  export CMAKE_BUILD_PARALLEL_LEVEL="$build_jobs"
+  export OMP_NUM_THREADS="$build_jobs"
+  export OPENBLAS_NUM_THREADS="$build_jobs"
+  export MKL_NUM_THREADS="$build_jobs"
+  export NUMEXPR_NUM_THREADS="$build_jobs"
   if [[ "$(uname -m)" == "aarch64" || "$(uname -m)" == "arm64" ]]; then
     vcpkg_triplet="arm64-linux-geo-release"
     vcpkg_host_triplet="arm64-linux"
@@ -106,7 +124,7 @@ build_openmvs() {
   clone_or_update_repo "https://github.com/microsoft/vcpkg.git" "$VCPKG_ROOT"
   if [[ ! -x "$VCPKG_ROOT/vcpkg" ]]; then
     log "bootstrapping vcpkg"
-    VCPKG_DISABLE_METRICS=1 "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+    run_cool env VCPKG_DISABLE_METRICS=1 "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
   fi
   mkdir -p "$overlay_triplets_dir"
   if [[ "$(uname -m)" == "aarch64" || "$(uname -m)" == "arm64" ]]; then
@@ -148,9 +166,9 @@ EOF
   if [[ "$openmvs_use_cuda" == "ON" ]]; then
     VCPKG_INSTALL_ARGS+=("--x-feature=cuda")
   fi
-  VCPKG_DISABLE_METRICS=1 "${VCPKG_INSTALL_ARGS[@]}"
+  run_cool env VCPKG_DISABLE_METRICS=1 "${VCPKG_INSTALL_ARGS[@]}"
   log "configuring OpenMVS with CUDA"
-  VCPKG_ROOT="$VCPKG_ROOT" VCPKG_DISABLE_METRICS=1 cmake \
+  run_cool env VCPKG_ROOT="$VCPKG_ROOT" VCPKG_DISABLE_METRICS=1 cmake \
     -S "$openmvs_dir" \
     -B "$openmvs_build" \
     -G Ninja \
@@ -167,11 +185,14 @@ EOF
     -DOpenMVS_USE_PYTHON=OFF \
     -DOpenMVS_USE_SIFTGPU=OFF
   log "building OpenMVS"
-  cmake --build "$openmvs_build" -j"$build_jobs"
+  run_cool cmake --build "$openmvs_build" -j"$build_jobs"
 }
 
 log "project root: $ROOT_DIR"
 require_cmd git
+if [[ "$THERMAL_SAFE" == "1" ]]; then
+  log "thermal-safe mode enabled"
+fi
 
 if [[ "$WITH_APT" == "1" ]]; then
   install_apt_deps
@@ -199,16 +220,16 @@ VENV_PY="$VENV_DIR/bin/python"
 VENV_PIP="$VENV_DIR/bin/pip"
 
 log "upgrading pip/setuptools/wheel"
-"$VENV_PY" -m pip install --upgrade pip "setuptools<82" wheel
+run_cool "$VENV_PY" -m pip install --upgrade pip "setuptools<82" wheel
 
 log "installing project base requirements"
-"$VENV_PIP" install -r "$PACKAGE_DIR/requirements/base.txt"
+run_cool "$VENV_PIP" install -r "$PACKAGE_DIR/requirements/base.txt"
 
 log "installing torch CUDA wheels from $TORCH_INDEX_URL"
-"$VENV_PIP" install torch torchvision --index-url "$TORCH_INDEX_URL"
+run_cool "$VENV_PIP" install torch torchvision --index-url "$TORCH_INDEX_URL"
 
 log "installing geo_uav_recon in editable mode"
-"$VENV_PIP" install -e "$PACKAGE_DIR"
+run_cool "$VENV_PIP" install -e "$PACKAGE_DIR"
 
 mkdir -p "$ROOT_DIR/.external"
 DUST3R_DIR="$ROOT_DIR/.external/dust3r"
@@ -218,14 +239,14 @@ clone_or_update_repo "https://github.com/naver/dust3r.git" "$DUST3R_DIR"
 clone_or_update_repo "https://github.com/naver/mast3r.git" "$MAST3R_DIR"
 
 log "installing DUSt3R requirements"
-"$VENV_PIP" install -r "$DUST3R_DIR/requirements.txt"
+run_cool "$VENV_PIP" install -r "$DUST3R_DIR/requirements.txt"
 if [[ -f "$DUST3R_DIR/requirements_optional.txt" ]]; then
-  "$VENV_PIP" install -r "$DUST3R_DIR/requirements_optional.txt" || true
+  run_cool "$VENV_PIP" install -r "$DUST3R_DIR/requirements_optional.txt" || true
 fi
 
 log "installing MASt3R requirements"
-"$VENV_PIP" install -r "$MAST3R_DIR/requirements.txt"
-"$VENV_PIP" install -r "$MAST3R_DIR/dust3r/requirements.txt"
+run_cool "$VENV_PIP" install -r "$MAST3R_DIR/requirements.txt"
+run_cool "$VENV_PIP" install -r "$MAST3R_DIR/dust3r/requirements.txt"
 
 if [[ "$WITH_OPENMVS" == "1" ]]; then
   build_openmvs
@@ -256,6 +277,7 @@ Recommended full run:
   "$ROOT_DIR/run_geo_project.sh" \\
     --no-bootstrap \\
     --python-bin "$VENV_PY" \\
+    --thermal-safe \\
     --coarse-device cuda \\
     --refine-device cuda \\
     --batch-size 4
