@@ -10,6 +10,8 @@ from typing import Sequence
 from urllib.parse import parse_qs, urlparse
 
 from huggingface_hub import hf_hub_download, list_repo_files
+import numpy as np
+from PIL import Image
 import requests
 
 from .dataset import summarize_dataset, validate_dataset_root
@@ -241,9 +243,26 @@ def prepare_odm_dataset(
 
 
 def _copy_frame_pair(rgb_src: Path, depth_src: Path, rgb_out: Path, depth_out: Path) -> None:
+    if rgb_src.suffix.lower() in {".npz", ".npy"} or rgb_out.suffix.lower() in {".npz", ".npy"}:
+        rgb_out = rgb_out.with_suffix(".png")
     rgb_out.parent.mkdir(parents=True, exist_ok=True)
     depth_out.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(rgb_src, rgb_out)
+    if rgb_src.suffix.lower() in {".npz", ".npy"}:
+        if rgb_src.suffix.lower() == ".npy":
+            rgb_array = np.asarray(np.load(rgb_src))
+        else:
+            payload = np.load(rgb_src)
+            if "rgb" in payload.files:
+                rgb_array = np.asarray(payload["rgb"])
+            elif payload.files:
+                rgb_array = np.asarray(payload[payload.files[0]])
+            else:
+                raise RuntimeError(f"RGB NPZ payload is empty: {rgb_src}")
+        if rgb_array.dtype != np.uint8:
+            rgb_array = np.clip(rgb_array, 0, 255).astype(np.uint8)
+        Image.fromarray(rgb_array).save(rgb_out)
+    else:
+        shutil.copy2(rgb_src, rgb_out)
     shutil.copy2(depth_src, depth_out)
 
 
@@ -255,7 +274,7 @@ def _collect_local_dronescapes_files(local_root: Path) -> tuple[dict[str, Path],
             continue
         suffix = path.suffix.lower()
         stem = path.stem
-        if suffix in {".png", ".jpg", ".jpeg"} and "/rgb" in path.as_posix():
+        if suffix in {".png", ".jpg", ".jpeg", ".npz", ".npy"} and "/rgb" in path.as_posix():
             rgb_files[stem] = path
         if suffix in {".npz", ".npy"} and "/depth" in path.as_posix():
             depth_files[stem] = path
@@ -277,6 +296,9 @@ def export_dronescapes_subset(
     output_path.mkdir(parents=True, exist_ok=True)
     rgb_out = output_path / "rgb"
     depth_out = output_path / "depth"
+    rgb_out.mkdir(parents=True, exist_ok=True)
+    depth_out.mkdir(parents=True, exist_ok=True)
+    selected_stems: list[str] = []
 
     if _is_valid_dataset("dronescapes", output_path):
         selected_stems = sorted(path.stem for path in rgb_out.glob("*"))
@@ -290,7 +312,7 @@ def export_dronescapes_subset(
             depth_repo_files = {}
             for file_path in repo_files:
                 lower = file_path.lower()
-                if split in file_path and rgb_modality in file_path and lower.endswith((".png", ".jpg", ".jpeg")):
+                if split in file_path and rgb_modality in file_path and lower.endswith((".png", ".jpg", ".jpeg", ".npz", ".npy")):
                     rgb_repo_files[Path(file_path).stem] = file_path
                 if split in file_path and depth_modality in file_path and lower.endswith((".npz", ".npy")):
                     depth_repo_files[Path(file_path).stem] = file_path
@@ -317,6 +339,13 @@ def export_dronescapes_subset(
                 selected_stems = common_stems[start_index:]
             for stem in selected_stems:
                 _copy_frame_pair(rgb_files[stem], depth_files[stem], rgb_out / rgb_files[stem].name, depth_out / depth_files[stem].name)
+
+    if not selected_stems:
+        raise RuntimeError(
+            "No matched Dronescapes frame pairs were exported. "
+            f"repo_id={repo_id}, split={split}, rgb_modality={rgb_modality}, depth_modality={depth_modality}, "
+            f"scene_prefixes={list(scene_prefixes or [])}, local_root={local_root!r}"
+        )
 
     selection_mode = "full_split" if start_index == 0 and (not max_frames or max_frames <= 0) and not scene_prefixes else "subset"
     payload = {

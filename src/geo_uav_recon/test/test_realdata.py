@@ -75,3 +75,20 @@ class TestRealDataHelpers(unittest.TestCase):
             self.assertEqual(payload["selection_mode"], "full_split")
             self.assertEqual(payload["num_frames"], 3)
             self.assertTrue((output_dir / "subset_manifest.json").exists())
+
+    def test_export_dronescapes_subset_converts_rgb_npz_to_png(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "dronescapes_local" / "test_set_annotated_only"
+            rgb_dir = local_root / "rgb"
+            depth_dir = local_root / "depth"
+            rgb_dir.mkdir(parents=True)
+            depth_dir.mkdir(parents=True)
+            stem = "barsana_demo_0001"
+            np.savez(rgb_dir / f"{stem}.npz", arr_0=np.full((24, 32, 3), 127, dtype=np.uint8))
+            np.savez(depth_dir / f"{stem}.npz", depth=np.ones((24, 32), dtype=np.float32))
+            output_dir = root / "prepared"
+            payload = export_dronescapes_subset(str(output_dir), local_root=str(root / "dronescapes_local"), max_frames=0)
+            self.assertEqual(payload["num_frames"], 1)
+            self.assertTrue((output_dir / "rgb" / f"{stem}.png").exists())
+            self.assertTrue((output_dir / "depth" / f"{stem}.npz").exists())
