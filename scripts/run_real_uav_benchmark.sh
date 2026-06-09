@@ -166,7 +166,7 @@ for sample in resolve_odm_benchmark_suite(sys.argv[1]):
     print(sample)
 PY
     )
-    for sample in "${ODM_SUITE_SAMPLES[@]}"; do
+    for sample in "${ODM_SUITE_SAMPLES[@]:-}"; do
       sample_output_dir="$ODM_OUTPUT_ROOT/$sample"
       ODM_ARGS=(
         -m geo_uav_recon.cli prepare-odm
@@ -213,7 +213,7 @@ for split in resolve_dronescapes_benchmark_suite(sys.argv[1]):
     print(split)
 PY
     )
-    for split in "${DRONESCAPES_SUITE_SPLITS[@]}"; do
+    for split in "${DRONESCAPES_SUITE_SPLITS[@]:-}"; do
       split_output_dir="$DRONESCAPES_OUTPUT_ROOT/$split"
       SUBSET_ARGS=(
         -m geo_uav_recon.cli dronescapes-subset
@@ -228,7 +228,7 @@ PY
       if [[ -n "$DRONESCAPES_SOURCE_ROOT" ]]; then
         SUBSET_ARGS+=(--local-root "$DRONESCAPES_SOURCE_ROOT")
       fi
-      for prefix in "${DRONESCAPES_SCENE_PREFIXES[@]}"; do
+      for prefix in "${DRONESCAPES_SCENE_PREFIXES[@]:-}"; do
         SUBSET_ARGS+=(--scene-prefix "$prefix")
       done
       "$PYTHON_BIN" "${SUBSET_ARGS[@]}" >/dev/null
@@ -248,7 +248,7 @@ PY
     if [[ -n "$DRONESCAPES_SOURCE_ROOT" ]]; then
       SUBSET_ARGS+=(--local-root "$DRONESCAPES_SOURCE_ROOT")
     fi
-    for prefix in "${DRONESCAPES_SCENE_PREFIXES[@]}"; do
+    for prefix in "${DRONESCAPES_SCENE_PREFIXES[@]:-}"; do
       SUBSET_ARGS+=(--scene-prefix "$prefix")
     done
     "$PYTHON_BIN" "${SUBSET_ARGS[@]}" >/dev/null
@@ -256,10 +256,10 @@ PY
   fi
 fi
 
-for odm_root in "${ODM_ROOTS[@]}"; do
+for odm_root in "${ODM_ROOTS[@]:-}"; do
   "$PYTHON_BIN" -m geo_uav_recon.cli validate-dataset --dataset-kind odmdata --dataset-root "$odm_root" >/dev/null
 done
-for dronescapes_root in "${DRONESCAPES_ROOTS[@]}"; do
+for dronescapes_root in "${DRONESCAPES_ROOTS[@]:-}"; do
   "$PYTHON_BIN" -m geo_uav_recon.cli validate-dataset --dataset-kind dronescapes --dataset-root "$dronescapes_root" >/dev/null
 done
 
@@ -278,10 +278,10 @@ CONFIG_ARGS=(
   --window-size "$WINDOW_SIZE"
   --batch-size "$BATCH_SIZE"
 )
-for odm_root in "${ODM_ROOTS[@]}"; do
+for odm_root in "${ODM_ROOTS[@]:-}"; do
   CONFIG_ARGS+=(--odm-root "$odm_root")
 done
-for dronescapes_root in "${DRONESCAPES_ROOTS[@]}"; do
+for dronescapes_root in "${DRONESCAPES_ROOTS[@]:-}"; do
   CONFIG_ARGS+=(--dronescapes-root "$dronescapes_root")
 done
 if [[ "$SKIP_COLMAP_OPENMVS" == "1" ]]; then
