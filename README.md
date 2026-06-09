@@ -5,7 +5,7 @@
 - `Dronescapes`
 - `ODMData`
 
-Phần mã nguồn chính nằm ở [src/geo_uav_recon](/Users/udy/GEO-repo/src/geo_uav_recon), tài liệu vận hành ở [GEO_PROJECT.md](/Users/udy/GEO-repo/GEO_PROJECT.md), và báo cáo survey ở [report/main_vi.pdf](/Users/udy/GEO-repo/report/main_vi.pdf).
+Phần mã nguồn chính nằm ở [src/geo_uav_recon](/Users/udy/GEO-repo/src/geo_uav_recon), tài liệu vận hành ở [GEO_PROJECT.md](/Users/udy/GEO-repo/GEO_PROJECT.md), kế hoạch hoàn thiện đồ án ở [report/THESIS_PLAN_VI.md](/Users/udy/GEO-repo/report/THESIS_PLAN_VI.md), và bản thảo đồ án tiếng Việt ở [report/thesis_vi.pdf](/Users/udy/GEO-repo/report/thesis_vi.pdf).
 
 ## Giải pháp chính
 

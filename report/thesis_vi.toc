@@ -1,0 +1,45 @@
+\contentsline {chapter}{Tóm tắt}{i}{chapter*.1}%
+\contentsline {chapter}{Danh mục hình}{iv}{chapter*.2}%
+\contentsline {chapter}{Danh mục bảng}{vi}{chapter*.3}%
+\contentsline {chapter}{\numberline {1}Mở đầu}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Lý do chọn đề tài}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Mục tiêu của đồ án}{2}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Phạm vi nghiên cứu}{3}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Đóng góp của đồ án}{3}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Bố cục báo cáo}{3}{section.1.5}%
+\contentsline {chapter}{\numberline {2}Tổng quan về 3D Reconstruction và các hướng nghiên cứu liên quan}{4}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Khái quát bài toán 3D reconstruction}{4}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Phân loại các hướng tiếp cận chính}{4}{section.2.2}%
+\contentsline {section}{\numberline {2.3}SfM/MVS và photogrammetry cổ điển}{5}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Neural reconstruction và feed-forward geometry}{6}{section.2.4}%
+\contentsline {section}{\numberline {2.5}NeRF, Gaussian Splatting và scene representation}{8}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Uncertainty, confidence và selective processing}{8}{section.2.6}%
+\contentsline {section}{\numberline {2.7}Khoảng trống nghiên cứu mà đề tài lựa chọn}{8}{section.2.7}%
+\contentsline {chapter}{\numberline {3}Cơ sở lý thuyết cho bài toán tái tạo UAV từ ảnh}{10}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Hình học camera và phép chiếu phối cảnh}{10}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Depth map, point cloud và pointmap}{11}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Các yếu tố làm khó tái tạo UAV}{11}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Khái niệm risk score trong đề tài}{12}{section.3.4}%
+\contentsline {chapter}{\numberline {4}Giải pháp đề xuất: Risk-Guided Hybrid Refinement}{14}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Phát biểu bài toán}{14}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Ý tưởng chính}{14}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Công thức risk score}{15}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Thuật toán pipeline}{16}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Ý nghĩa của novelty}{16}{section.4.5}%
+\contentsline {chapter}{\numberline {5}Thiết kế và cài đặt hệ thống GEO}{17}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Kiến trúc tổng thể}{17}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Cấu trúc mã nguồn}{17}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Thiết lập thực thi}{18}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Các chế độ chạy}{19}{section.5.4}%
+\contentsline {chapter}{\numberline {6}Thực nghiệm và đánh giá}{20}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Dataset sử dụng}{20}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Các phương pháp so sánh}{20}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Kết quả định lượng trên Dronescapes}{21}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Kết quả định lượng trên ODMData}{21}{section.6.4}%
+\contentsline {section}{\numberline {6.5}Kết quả định tính}{22}{section.6.5}%
+\contentsline {section}{\numberline {6.6}Thảo luận}{24}{section.6.6}%
+\contentsline {section}{\numberline {6.7}Giới hạn của đồ án}{24}{section.6.7}%
+\contentsline {chapter}{\numberline {7}Kết luận và hướng phát triển}{25}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Kết luận}{25}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Hướng phát triển}{25}{section.7.2}%
+\contentsline {chapter}{\numberline {A}Phụ lục: Hướng dẫn chạy nhanh}{27}{appendix.A}%

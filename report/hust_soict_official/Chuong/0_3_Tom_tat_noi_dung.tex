@@ -1,0 +1,19 @@
+\documentclass[../DoAn.tex]{subfiles}
+\begin{document}
+
+\begin{center}
+    \Large{\textbf{TÓM TẮT NỘI DUNG ĐỒ ÁN}}\\
+\end{center}
+\vspace{1cm}
+\addcontentsline{toc}{chapter}{Tóm tắt}
+
+Đồ án này nghiên cứu bài toán tái tạo hình học từ ảnh UAV trong bối cảnh chi phí tính toán là một ràng buộc quan trọng. Thay vì refine toàn bộ chuỗi ảnh bằng một mô hình mạnh và đắt đỏ, đề tài đề xuất một pipeline \textit{risk-guided hybrid refinement}: trước hết chạy DUSt3R để có lớp hình học thô trên toàn bộ scene, sau đó chấm điểm rủi ro tái tạo cho từng frame dựa trên các thành phần về overlap, texture, depth prior và vị trí nhìn, cuối cùng chỉ refine các frame có rủi ro cao bằng MASt3R. Hệ thống được hiện thực hóa thành một repo độc lập có benchmark, script chạy, chuẩn bị dữ liệu và trực quan hóa. Thực nghiệm được tiến hành trên hai dataset thật là Dronescapes và ODMData. Kết quả cho thấy phương pháp đề xuất cải thiện nhẹ nhưng ổn định so với coarse baseline DUSt3R trên Dronescapes, đồng thời giữ được chất lượng cạnh tranh trong khi chỉ refine một phần nhỏ số frame. Tuy nhiên, phương pháp hiện tại chưa vượt MASt3R full-pass về độ chính xác tuyệt đối. Đóng góp chính của đồ án là xây dựng một pipeline hoàn chỉnh, có thể chạy được trên dữ liệu UAV thật, và chỉ ra rằng selective refinement theo mức rủi ro là một hướng có tiềm năng tốt cho bài toán tái tạo UAV có ràng buộc ngân sách tính toán.
+
+\begin{flushright}
+Sinh viên thực hiện\\
+\begin{tabular}{@{}c@{}}
+\textit{(Ký và ghi rõ họ tên)}
+\end{tabular}
+\end{flushright}
+
+\end{document}

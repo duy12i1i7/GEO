@@ -1,0 +1,69 @@
+\documentclass[../DoAn.tex]{subfiles}
+\begin{document}
+
+\section{Kiến trúc tổng thể}
+
+Repo GEO được tổ chức như một benchmark độc lập cho UAV reconstruction. Hệ thống gồm các thành phần chính:
+\begin{enumerate}[leftmargin=1.5em]
+  \item module chuẩn bị và đọc dataset;
+  \item module predictor cho DUSt3R và MASt3R;
+  \item module risk estimation;
+  \item module benchmark và visualization;
+  \item bộ script bootstrap, POC và full run.
+\end{enumerate}
+
+\section{Cấu trúc mã nguồn}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4cm} X}
+\toprule
+\textbf{Tệp/thư mục} & \textbf{Vai trò} \\
+\midrule
+\texttt{dataset.py} & Loader cho Dronescapes, ODMData và phần tóm tắt dataset \\
+\texttt{realdata.py} & Chuẩn bị dữ liệu thật, export subset, mapping suite dataset \\
+\texttt{predictors.py} & Wrapper cho DUSt3R, MASt3R và các output depth \\
+\texttt{risk.py} & Tính điểm rủi ro và chọn frame refine \\
+\texttt{benchmark.py} & Giao thức benchmark, metric, tổng hợp báo cáo \\
+\texttt{scripts/} & Bootstrap, runner POC, runner full thermal-safe \\
+\texttt{run\_geo\_project.sh} & Entry point end-to-end cho dự án \\
+\bottomrule
+\end{tabularx}
+\caption{Cấu trúc thành phần chính của hệ thống GEO.}
+\label{tab:repo-structure}
+\end{table}
+
+\section{Thiết lập thực thi}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lp{8.3cm}}
+\toprule
+Thiết lập & Giá trị \\
+\midrule
+Coarse image size & 224 \\
+Refine image size & 384 \\
+Batch size & 1 trong run POC ổn định được dùng cho báo cáo \\
+Top-$K$ refined frames & 8 \\
+Risk neighbors & 4 \\
+Thiết bị coarse/refine & CUDA trên máy server run chính \\
+Mã nguồn & \url{https://github.com/duy12i1i7/GEO} \\
+\bottomrule
+\end{tabular}
+\caption{Một số tham số chính của implementation được dùng trong thực nghiệm báo cáo.}
+\label{tab:implementation-thesis}
+\end{table}
+
+\section{Các chế độ chạy}
+
+Hiện hệ thống hỗ trợ hai kiểu chạy hữu ích:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{POC/balanced}: phục vụ kiểm tra ý tưởng trên máy Ubuntu + NVIDIA tầm trung, có thể bỏ OpenMVS để giảm tải;
+  \item \textbf{full}: chạy suite rộng hơn cho ODMData và nhiều split hơn của Dronescapes trên máy mạnh.
+\end{enumerate}
+
+Thiết kế này giúp đồ án vừa có tính thực dụng trong phát triển, vừa có đường mở để mở rộng benchmark sau này.
+
+\end{document}

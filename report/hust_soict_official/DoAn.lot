@@ -1,0 +1,16 @@
+\babel@toc {english}{}\relax 
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Các hướng nghiên cứu lớn của 3D reconstruction và mức độ liên quan tới đề tài.}}{4}{table.caption.9}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Cấu trúc thành phần chính của hệ thống GEO.}}{14}{table.caption.19}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Một số tham số chính của implementation được dùng trong thực nghiệm báo cáo.}}{15}{table.caption.20}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {6.1}{\ignorespaces Kết quả trên Dronescapes. Đây là các số ground-truth trực tiếp từ run server được chọn làm run báo cáo.}}{17}{table.caption.21}%
+\contentsline {table}{\numberline {6.2}{\ignorespaces Kết quả trên ODMData khi so sánh tương đối với depth maps tham chiếu được dựng lại từ COLMAP/OpenMVS đã lưu.}}{18}{table.caption.22}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsfinish 
+\contentsfinish 

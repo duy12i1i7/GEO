@@ -1,0 +1,21 @@
+\documentclass[../DoAn.tex]{subfiles}
+\begin{document}
+
+\section{Kết luận}
+
+Đồ án đã hoàn thành ba việc cốt lõi. Thứ nhất, hệ thống hóa bối cảnh nghiên cứu của bài toán tái tạo 3D và xác định vị trí của UAV image-based reconstruction trong bức tranh chung. Thứ hai, đề xuất và hiện thực hóa một pipeline \textit{risk-guided hybrid refinement} dựa trên DUSt3R, MASt3R và chiến lược chọn frame theo rủi ro. Thứ ba, xây dựng được một repo benchmark độc lập và chạy thực nghiệm trên hai dataset thật.
+
+Kết quả cho thấy selective refinement theo mức rủi ro là một hướng có cơ sở. Trong trạng thái hiện tại, phương pháp đề xuất chưa vượt MASt3R full-pass về độ chính xác tuyệt đối, nhưng đã thể hiện một câu chuyện rõ ràng hơn về \textbf{trade-off giữa chất lượng và chi phí tính toán}. Đây là kết luận hợp lý và trung thực nhất của đồ án.
+
+\section{Hướng phát triển}
+
+Các hướng mở rộng tiếp theo gồm:
+\begin{enumerate}[leftmargin=1.5em]
+  \item học trực tiếp risk score thay vì dùng heuristic tuyến tính;
+  \item thử nghiệm chiến lược budget allocation động theo scene complexity;
+  \item thêm các ablation như random selection, overlap-only, texture-only;
+  \item tích hợp chặt hơn coarse prediction và refine prediction thay vì overwrite hoặc merge đơn giản;
+  \item mở rộng sang các nhánh thời gian thực hoặc SLAM-aware reconstruction.
+\end{enumerate}
+
+\end{document}

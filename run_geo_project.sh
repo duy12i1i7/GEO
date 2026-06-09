@@ -376,7 +376,7 @@ if [[ -n "$DRONESCAPES_BENCHMARK_SUITE" ]]; then
 else
   REAL_ARGS+=(--dronescapes-root "$DRONESCAPES_ROOT" --dronescapes-split "$DRONESCAPES_SPLIT")
 fi
-for prefix in "${DRONESCAPES_SCENE_PREFIXES[@]}"; do
+for prefix in "${DRONESCAPES_SCENE_PREFIXES[@]:-}"; do
   [[ -n "$prefix" ]] && REAL_ARGS+=(--dronescapes-scene-prefix "$prefix")
 done
 
@@ -433,7 +433,7 @@ if [[ -n "$DRONESCAPES_BENCHMARK_SUITE" || ! -d "$DRONESCAPES_ROOT" ]]; then
   if [[ -n "$DRONESCAPES_SOURCE_ROOT" ]]; then
     REAL_ARGS+=(--dronescapes-source-root "$DRONESCAPES_SOURCE_ROOT")
   fi
-  for prefix in "${DRONESCAPES_SCENE_PREFIXES[@]}"; do
+  for prefix in "${DRONESCAPES_SCENE_PREFIXES[@]:-}"; do
     [[ -n "$prefix" ]] && REAL_ARGS+=(--dronescapes-scene-prefix "$prefix")
   done
   if [[ "$MODE" == "full" ]]; then

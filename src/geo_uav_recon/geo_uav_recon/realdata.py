@@ -13,6 +13,7 @@ from huggingface_hub import hf_hub_download, list_repo_files
 import numpy as np
 from PIL import Image
 import requests
+import gdown
 
 from .dataset import summarize_dataset, validate_dataset_root
 
@@ -136,49 +137,15 @@ def _extract_drive_file_id(url: str) -> str | None:
     return None
 
 
-def _drive_confirm_token(response: requests.Response) -> str | None:
-    for key, value in response.cookies.items():
-        if key.startswith("download_warning"):
-            return value
-    content_type = response.headers.get("content-type", "").lower()
-    if "text/html" not in content_type:
-        return None
-    text = response.text
-    match = re.search(r"confirm=([0-9A-Za-z_]+)", text)
-    if match:
-        return match.group(1)
-    match = re.search(r'name="confirm"\s+value="([^"]+)"', text)
-    if match:
-        return match.group(1)
-    return None
-
-
 def _download_google_drive(url: str, destination: Path) -> Path:
     file_id = _extract_drive_file_id(url)
     if not file_id:
         raise RuntimeError(f"Could not extract Google Drive file id from {url}")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    base_url = "https://drive.google.com/uc"
-    session = requests.Session()
-    params = {"export": "download", "id": file_id}
-    response = session.get(base_url, params=params, stream=True, timeout=180)
-    token = _drive_confirm_token(response)
-    if token:
-        response.close()
-        params["confirm"] = token
-        response = session.get(base_url, params=params, stream=True, timeout=180)
-    response.raise_for_status()
-    content_type = response.headers.get("content-type", "").lower()
-    if "text/html" in content_type:
-        preview = response.text[:400]
-        response.close()
-        raise RuntimeError(f"Google Drive did not return a downloadable archive for {url}. Response preview: {preview}")
-    with destination.open("wb") as handle:
-        for chunk in response.iter_content(chunk_size=1024 * 1024):
-            if chunk:
-                handle.write(chunk)
-    response.close()
+    gdown.download(id=file_id, output=str(destination), quiet=False)
+    if not destination.exists() or destination.stat().st_size == 0:
+        raise RuntimeError(f"Failed to download Google Drive file from {url}")
     return destination
 
 

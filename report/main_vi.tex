@@ -21,237 +21,293 @@
 \renewcommand{\arraystretch}{1.15}
 \urlstyle{same}
 
-\title{Khảo sát dataset và đề xuất hướng nghiên cứu gọn cho bài toán tái tạo 2D/2.5D/3D từ chuỗi ảnh UAV trên một dataset duy nhất}
-\author{Biên soạn cho đề tài: tái tạo bản đồ từ chuỗi ảnh liên tiếp thu nhận bởi UAV}
-\date{Ngày 03 tháng 05 năm 2026}
+\title{Risk-Guided Hybrid Refinement cho tái tạo 3D từ ảnh UAV: nghiên cứu thực nghiệm trên Dronescapes và ODMData}
+\author{Bản thảo paper thực nghiệm cho dự án GEO}
+\date{Ngày 12 tháng 05 năm 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Báo cáo này thu hẹp bài toán tái tạo 2D/2.5D/3D từ chuỗi ảnh UAV về một cấu hình thực dụng hơn: \textbf{chỉ dùng một dataset công khai duy nhất} để vừa triển khai được, vừa còn giữ được giá trị nghiên cứu. Sau khi rà soát mặt bằng các dataset UAV công khai còn truy cập được đến ngày 03/05/2026, báo cáo kết luận rằng \textbf{UseGeo} là lựa chọn phù hợp nhất nếu mục tiêu là nghiên cứu tái tạo hình học từ ảnh UAV mà không phải ghép nhiều nguồn dữ liệu dị loại. Đồng thời, báo cáo đánh giá thẳng rằng hướng ``monocular depth + pose-guided fusion + uncertainty'' theo kiểu full pipeline đã bị phủ khá mạnh bởi các nghiên cứu gần đây trên photogrammetry, monocular priors và benchmark aerial blocks. Vì vậy, thay vì tiếp tục một đề tài quá rộng, báo cáo đề xuất một hướng gọn và khả thi hơn: \textbf{RGSR-UseGeo} (\textit{Risk-Guided Selective Refinement for UseGeo}), tức là tái tạo thô trên toàn block ảnh, sau đó chỉ dành ngân sách tinh chỉnh đắt đỏ cho những vùng hoặc khung hình được dự báo là rủi ro cao. Điểm mới nằm ở \textbf{phân bổ ngân sách tái tạo theo rủi ro hình học và độ khó của block ảnh}, thay vì cố gắng thiết kế một hệ UAV ``làm mọi thứ''. Hướng này không phải là một tuyên bố đột phá tuyệt đối, nhưng là một luận điểm nghiên cứu chặt hơn, trung thực hơn và phù hợp hơn với ràng buộc triển khai thực tế.
+Bài báo này trình bày một hướng triển khai thực dụng cho bài toán tái tạo hình học từ ảnh UAV, trong đó mục tiêu không phải là tối đa hóa chất lượng tuyệt đối bằng một pipeline đắt đỏ trên toàn bộ chuỗi ảnh, mà là \textbf{phân bổ chọn lọc ngân sách tinh chỉnh} vào những khung hình có rủi ro tái tạo cao. Phương pháp đề xuất, gọi là \textbf{risk-guided hybrid refinement}, sử dụng \textbf{DUSt3R} để suy ra hình học thô trên toàn bộ tập ảnh, chấm điểm rủi ro cho từng khung hình dựa trên thiếu hỗ trợ láng giềng, độ nghèo texture, thành phần depth prior và vị trí nhìn, sau đó chỉ chạy \textbf{MASt3R} trên tập con khung hình có rủi ro cao nhất. Phương pháp được đánh giá trên hai nguồn dữ liệu UAV thật: \textbf{Dronescapes} và \textbf{ODMData}. Kết quả cho thấy trên Dronescapes, phương pháp đề xuất đạt \textbf{RMSE 447.81} so với \textbf{447.94} của DUSt3R, đồng thời chỉ tinh chỉnh \textbf{25\%} số khung hình; trên ODMData ở chế độ pseudo-reference, phương pháp đề xuất cải thiện rõ rệt so với DUSt3R và tiến gần hơn tới lời giải tham chiếu. Tuy nhiên, kết quả cũng cho thấy phiên bản hiện tại \textbf{chưa vượt MASt3R full-pass về độ chính xác tuyệt đối} và \textbf{chưa thắng về thời gian chạy}, do vẫn chịu overhead của coarse pass, selective refine và khâu hợp nhất. Kết luận chính của bài báo là: selective refinement theo rủi ro là một hướng \textbf{có tín hiệu nghiên cứu tốt}, nhưng để trở thành một giải pháp vượt trội toàn diện thì còn cần tối ưu sâu hơn ở cấp độ mô hình và lịch lập lịch tính toán.
 \end{abstract}
 
-\section{Bối cảnh và ràng buộc thiết kế}
+\section{Giới thiệu}
 
-Bài toán gốc có thể được phát biểu ngắn gọn như sau: từ một chuỗi ảnh UAV theo thời gian, ước lượng quỹ đạo camera và sinh ra các sản phẩm bản đồ 2D, 2.5D hoặc 3D đủ hữu dụng cho phân tích và mô hình hóa. Văn liệu nền cho thấy UAV photogrammetry, SfM, MVS và georeferencing đã rất trưởng thành \citep{Colomina2014Unmanned,Zhao2014Direct,Jiang2017Efficient,Jiang2020Efficient}. Tuy nhiên, khi ràng buộc thêm điều kiện \textbf{chỉ một dataset}, vấn đề nghiên cứu phải đổi khác. Một đề tài kiểu ``hệ world model UAV hợp nhất online/offline, semantic, uncertainty, active planning'' có thể hấp dẫn về ý tưởng, nhưng quá rộng nếu toàn bộ thực nghiệm chỉ dựa trên một nguồn dữ liệu duy nhất.
+Tái tạo bản đồ 2D/2.5D/3D từ ảnh UAV là một bài toán trung tâm trong photogrammetry, bản đồ số và robot thị giác. Trong hơn một thập kỷ qua, cộng đồng đã phát triển rất mạnh các pipeline \textit{Structure-from-Motion} (SfM), \textit{Multi-View Stereo} (MVS) và các hệ visual mapping quy mô lớn cho ảnh UAV \citep{Colomina2014Unmanned,Jiang2017Efficient,Jiang2020Efficient,Liu2023Deep,Jiang2024Efficient}. Các phương pháp cổ điển như COLMAP cho phép phục hồi quỹ đạo camera và cấu trúc thưa khá ổn định \citep{Schonberger2016SfM}, trong khi các hệ MVS và neural reconstruction gần đây tiếp tục đẩy chất lượng hình học lên cao hơn nữa \citep{Liao2024High,Wu2025AerialBlocks}.
 
-Vì vậy, báo cáo này áp dụng ba ràng buộc ngay từ đầu:
+Tuy nhiên, bài toán thực tế lại không chỉ là ``dựng được hay không'', mà là \textbf{dựng với ngân sách tính toán nào}. Một pipeline đầy đủ kiểu SfM/MVS truyền thống có thể cho kết quả hình học tốt, nhưng chi phí chạy lớn và khó co giãn theo quy mô dữ liệu. Ở chiều ngược lại, các mô hình học sâu thế hệ mới như DUSt3R và MASt3R cho thấy tiềm năng rất cao cho tái tạo trực tiếp từ ảnh \citep{Wang2024DUSt3R,Leroy2024MASt3R,Wu2025AerialBlocks}, nhưng cũng đặt ra câu hỏi mới: có nhất thiết phải chạy mô hình nặng trên \textit{mọi} khung hình hay không?
+
+Từ góc nhìn đó, bài báo này theo đuổi một luận điểm gọn nhưng thực dụng hơn: \textbf{không phải mọi khung hình đều đáng được tinh chỉnh như nhau}. Một số khung hình có thể đã đủ tốt sau bước tái tạo thô; một số khác lại mang rủi ro hình học cao do texture thấp, overlap yếu hoặc cấu hình góc nhìn bất lợi. Nếu có thể phát hiện đúng những vùng khó và chỉ tập trung ngân sách tính toán vào đó, pipeline có thể đạt điểm cân bằng tốt hơn giữa chất lượng và chi phí.
+
+Trên cơ sở đó, bài báo đề xuất \textbf{risk-guided hybrid refinement}, một pipeline hai tầng:
 \begin{enumerate}[leftmargin=1.5em]
-  \item chỉ sử dụng một dataset công khai cho toàn bộ dự án;
-  \item ưu tiên bài toán \textbf{tái tạo hình học} hơn là geo-localization hay multi-sensor SLAM;
-  \item đề tài phải đủ gọn để còn có thể triển khai bằng một baseline rõ ràng trong repo hiện tại.
+  \item chạy DUSt3R trên toàn bộ tập ảnh để tạo ra một lớp hình học thô;
+  \item chấm điểm rủi ro cho từng khung hình;
+  \item chỉ refine các khung hình rủi ro cao bằng MASt3R;
+  \item hợp nhất kết quả coarse và refine để thu được đầu ra cuối.
 \end{enumerate}
 
-\section{Mặt bằng dataset UAV công khai hiện có}
-
-Tại thời điểm khảo sát, có thể nhóm các dataset UAV công khai còn truy cập được thành bốn họ chính:
+Đóng góp chính của bài báo gồm bốn điểm:
 \begin{enumerate}[leftmargin=1.5em]
-  \item \textbf{dataset phục vụ tái tạo 3D và depth}: UseGeo, UAVStereo, một phần Dronescapes;
-  \item \textbf{dataset video UAV cho semantic/depth}: UAVid, UAVid-depth, AeroScapes;
-  \item \textbf{dataset localization hoặc cross-view}: UAV-VisLoc, AerialVL, ALTO;
-  \item \textbf{dataset synthetic hoặc multi-sensor mạnh}: Mid-Air, MUN-FRL, AgriLiRa4D, UAVScenes.
+  \item xây dựng một formulation \textbf{selective refinement theo rủi ro} cho tái tạo UAV;
+  \item hiện thực hóa formulation này thành một pipeline benchmark khả dụng trong dự án GEO;
+  \item đánh giá hệ thống trên \textbf{hai dataset thật} là Dronescapes và ODMData;
+  \item rút ra một kết luận trung thực: phương pháp đề xuất \textbf{có ưu thế về trade-off chất lượng/chi phí}, nhưng \textbf{chưa phải phương án tốt nhất tuyệt đối}.
 \end{enumerate}
+
+\section{Công trình liên quan}
+
+\subsection{Photogrammetry và MVS cho ảnh UAV}
+
+Ảnh UAV đã trở thành nguồn dữ liệu quan trọng cho bản đồ 3D và khảo sát địa không gian \citep{Colomina2014Unmanned}. Các nghiên cứu về SfM hiệu quả cho ảnh UAV, đặc biệt ở ảnh oblique và quy mô lớn, đã cải thiện đáng kể lựa chọn cặp ảnh, hợp nhất graph và khả năng mở rộng \citep{Jiang2017Efficient,Jiang2020Efficient,Jiang2022Leveraging,Jiang2022Parallel,Jiang2024Efficient}. Song song đó, MVS dựa trên học sâu và các chiến lược nâng completeness cho urban scenes tiếp tục nâng chất lượng hình học, đặc biệt ở các khu vực phức tạp \citep{Liu2023Deep,Liao2024High}.
+
+Tuy nhiên, các pipeline này nhìn chung vẫn có một đặc điểm chung: \textbf{chi ngân sách tái tạo tương đối đồng đều trên toàn bộ tập ảnh}. Đây là một giả định hợp lý ở pipeline offline chuẩn, nhưng lại kém linh hoạt nếu mục tiêu là giảm chi phí mà vẫn duy trì chất lượng đủ cao.
+
+\subsection{Neural reconstruction và các mô hình pointmap}
+
+Các mô hình pointmap gần đây đã thay đổi đáng kể bức tranh tái tạo hình học. DUSt3R đề xuất dự báo trực tiếp pointmaps và nới lỏng các ràng buộc projective truyền thống, từ đó đơn giản hóa đáng kể bài toán dựng hình học từ một hoặc nhiều ảnh \citep{Wang2024DUSt3R}. Trên nền đó, MASt3R mở rộng sang bài toán matching trong không gian 3D và cải thiện mạnh về độ mạnh matching cũng như downstream geometry \citep{Leroy2024MASt3R}.
+
+Khi áp dụng lên aerial blocks, các mô hình này cho thấy tiềm năng lớn, đặc biệt trong các thiết lập góc nhìn khó hoặc sparse reconstruction \citep{Wu2025AerialBlocks}. Dù vậy, việc chạy full-pass các mô hình này trên mọi khung hình vẫn tốn kém, và câu hỏi về \textbf{phân bổ chọn lọc tính toán} vẫn còn khá mở.
+
+\subsection{Uncertainty, confidence và selective processing}
+
+Trong dense reconstruction, confidence và uncertainty từ lâu đã được xem là chìa khóa để kiểm soát lỗi \citep{Li2020Confidence}. Ở UAV mapping và robot mapping, nhiều hệ thống cũng đã tận dụng các chỉ báo độ tin cậy để quyết định nơi cần đo dày hơn hoặc nơi nên cập nhật world model mạnh hơn \citep{Campos2021ORB,Qin2018VINS,Wang2024Benchmarking}. Tuy nhiên, trên bài toán tái tạo UAV từ ảnh trong thiết lập hiện tại, vẫn còn thiếu một pipeline rõ ràng kết nối:
+\begin{enumerate}[leftmargin=1.5em]
+  \item một coarse pass phủ toàn cục,
+  \item một risk model ở mức frame,
+  \item và một refinement pass có ngân sách hạn chế.
+\end{enumerate}
+
+\subsection{Dataset và bối cảnh benchmark}
+
+Để đánh giá ý tưởng theo hướng thực dụng, bài báo này dùng hai dataset thật có vai trò bổ sung nhau:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{Dronescapes}, một benchmark UAV hướng semantic/depth/normals, hữu ích cho đo định lượng depth với ground-truth hoặc depth chuẩn hóa theo benchmark \citep{DronescapesDataset};
+  \item \textbf{ODMData}, tập hợp các block ảnh photogrammetry thật do OpenDroneMap công bố để benchmark pipeline dựng bản đồ \citep{ODMDataBenchmarks}.
+\end{enumerate}
+
+Ngoài ra, bài báo cũng ý thức rằng các nhánh như 3D Gaussian Splatting đang rất mạnh ở novel-view synthesis và scene representation \citep{Yao2026ARSGaussian,Gao2025Enhanced}. Tuy nhiên, vì mục tiêu của nghiên cứu này là \textbf{depth-centric reconstruction under computational budget}, các phương pháp đó không được đưa vào benchmark chính của bài báo.
+
+\section{Phương pháp đề xuất}
+
+\subsection{Phát biểu bài toán}
+
+Cho một tập ảnh UAV $\mathcal{I}=\{I_i\}_{i=1}^{N}$, mục tiêu là sinh ra một biểu diễn hình học đủ dùng cho mapping với chi phí nhỏ hơn so với việc refine toàn bộ tập ảnh bằng mô hình mạnh nhất. Ta muốn thiết kế một hàm chọn lọc sao cho chỉ một tập con $\mathcal{S}\subseteq \mathcal{I}$ được đưa qua bước refinement nặng, trong khi phần còn lại chỉ dùng kết quả coarse.
+
+Ở đây, bài toán được viết lại thành:
+\[
+\min_{\mathcal{S}} \; \mathcal{L}_{geo}(\hat{\mathcal{D}}(\mathcal{I}, \mathcal{S})) + \lambda \, \mathcal{C}(\mathcal{S}),
+\]
+trong đó $\hat{\mathcal{D}}$ là depth/reconstruction cuối cùng sau khi hợp nhất coarse và refine, còn $\mathcal{C}(\mathcal{S})$ là chi phí tính toán tỷ lệ với số frame được refine.
+
+\subsection{Kiến trúc pipeline}
+
+Pipeline đề xuất gồm bốn bước:
+
+\textbf{Bước 1: coarse reconstruction bằng DUSt3R.}
+Toàn bộ tập ảnh được đưa qua DUSt3R để sinh ra depth hoặc pointmap thô. Bước này cung cấp lớp hình học nền trên toàn bộ scene.
+
+\textbf{Bước 2: ước lượng rủi ro theo frame.}
+Với mỗi frame, tính bốn thành phần:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{overlap term} phản ánh mức thiếu hỗ trợ từ các ảnh láng giềng;
+  \item \textbf{texture term} phản ánh độ nghèo texture cục bộ;
+  \item \textbf{depth term} phản ánh độ bất định của depth prior nếu có;
+  \item \textbf{view term} phản ánh mức bất lợi do vị trí nhìn trong chuỗi.
+\end{enumerate}
+
+Trong implementation hiện tại, điểm rủi ro được tính bởi:
+\[
+R_i = 0.35\,O_i + 0.25\,T_i + 0.20\,D_i + 0.20\,V_i,
+\]
+với $O_i, T_i, D_i, V_i \in [0,1]$ sau chuẩn hóa min-max. Cụ thể:
+\begin{itemize}[leftmargin=1.5em]
+  \item $O_i$ tăng khi cosine similarity với các frame láng giềng giảm;
+  \item $T_i$ tăng khi độ lệch chuẩn mức xám giảm, tức texture nghèo hơn;
+  \item $D_i$ tăng khi depth prior có độ phân tán lớn; trong benchmark hiện tại, thành phần này bị vô hiệu vì không bật prior depth ngoại sinh;
+  \item $V_i$ tăng khi frame ở xa vùng trung tâm của chuỗi.
+\end{itemize}
+
+\textbf{Bước 3: selective refinement bằng MASt3R.}
+Chỉ các frame có điểm $R_i$ cao nhất mới được refine bằng MASt3R. Trong benchmark hiện tại, ngân sách refine được đặt là:
+\[
+K = 8
+\]
+frame trên mỗi dataset.
+
+\textbf{Bước 4: merge coarse và refine.}
+Depth đã refine sẽ ghi đè hoặc hợp nhất với coarse depth trên tập frame được chọn, tạo ra đầu ra cuối cho benchmark.
+
+\subsection{Bản chất của novelty}
+
+Điểm mới của phương pháp không nằm ở việc phát minh một backbone 3D mới, mà ở cách \textbf{biến quyết định ``refine ở đâu'' thành đối tượng tối ưu chính}. Nói cách khác, bài báo đặt trọng tâm vào \textbf{tính kinh tế của refinement}, chứ không chỉ vào chất lượng cuối.
+
+\section{Thiết lập thực nghiệm}
+
+\subsection{Dataset}
+
+\textbf{ODMData.} Bài báo dùng sample \texttt{mygla} từ bộ benchmark chính thức của OpenDroneMap \citep{ODMDataBenchmarks}. Sau bước chuẩn bị, dataset này có \textbf{29 frame} trong cấu hình benchmark hiện tại.
+
+\textbf{Dronescapes.} Bài báo dùng split \texttt{test\_set\_annotated\_only} của Dronescapes \citep{DronescapesDataset}, và lấy \textbf{32 frame} cho bài toán POC. Một chi tiết quan trọng về implementation là phần \texttt{rgb} trên nguồn dữ liệu Hugging Face của Dronescapes được lưu dưới dạng \texttt{.npz}; pipeline của dự án đã chuyển đổi chúng về \texttt{.png} ở bước export để phục vụ benchmark thống nhất.
+
+\subsection{Phương pháp so sánh}
+
+Ba phương pháp được đưa vào thực nghiệm hiện tại là:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{DUSt3R full-pass} (\texttt{dust3r\_real}): chạy DUSt3R trên toàn bộ tập ảnh;
+  \item \textbf{MASt3R full-pass} (\texttt{mast3r\_real}): chạy MASt3R trên toàn bộ tập ảnh;
+  \item \textbf{risk-guided hybrid refinement} (\texttt{risk\_hybrid\_real}): coarse DUSt3R + chọn top-$K$ frame theo risk + refine bằng MASt3R.
+\end{enumerate}
+
+Framework GEO cũng hỗ trợ nhánh \texttt{COLMAP + OpenMVS}, nhưng run thực nghiệm được báo cáo trong bài này là một run POC neural-centric nên không bao gồm baseline photogrammetry cổ điển.
+
+\subsection{Thiết lập tham số}
+
+Run thực nghiệm trên máy \texttt{avis@100.96.109.77} sử dụng:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{coarse image size}: 224;
+  \item \textbf{refine image size}: 384;
+  \item \textbf{batch size}: 1;
+  \item \textbf{window size}: 2;
+  \item \textbf{top-$K$ refine frames}: 8;
+  \item \textbf{risk neighbors}: 4;
+  \item \textbf{coarse/refine device}: CUDA.
+\end{enumerate}
+
+Phần cứng chạy benchmark gồm:
+\begin{enumerate}[leftmargin=1.5em]
+  \item CPU Intel Core Ultra 9 285K;
+  \item RAM 60 GiB;
+  \item GPU NVIDIA RTX 5000 Ada 32 GiB;
+  \item Ubuntu 24.04.4.
+\end{enumerate}
+
+\subsection{Metric đánh giá}
+
+Trên Dronescapes, bài báo dùng:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{MAE},
+  \item \textbf{RMSE},
+  \item \textbf{AbsRel},
+  \item \textbf{valid ratio},
+  \item \textbf{runtime}.
+\end{enumerate}
+
+Trên ODMData, vì không có ground-truth depth trực tiếp cho thiết lập benchmark hiện tại, hệ thống dùng \textbf{pseudo-reference evaluation}. Ở run này, \texttt{MASt3R} được chọn làm \textbf{reference method}, nên sai số của chính \texttt{mast3r\_real} trên ODMData bằng 0 theo định nghĩa và chỉ nên được xem là mốc neo để so sánh khoảng cách của các phương pháp khác.
+
+\section{Kết quả}
+
+\subsection{Kết quả trên Dronescapes}
 
 \begin{table}[t]
 \centering
 \small
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{1.9cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.1cm} >{\centering\arraybackslash}p{1.8cm} >{\centering\arraybackslash}p{1.8cm} >{\centering\arraybackslash}p{1.6cm} >{\centering\arraybackslash}p{1.8cm} >{\centering\arraybackslash}p{1.7cm}}
 \toprule
-\textbf{Dataset} & \textbf{Kiểu dữ liệu} & \textbf{Điểm mạnh} & \textbf{Điểm yếu nếu chỉ dùng một bộ} \\
+\textbf{Phương pháp} & \textbf{MAE} & \textbf{RMSE} & \textbf{AbsRel} & \textbf{Runtime (s)} & \textbf{Selected ratio} \\
 \midrule
-UseGeo & Ảnh UAV + GT depth + pose + LiDAR & Phù hợp trực tiếp cho depth, point cloud, mesh, benchmark tái tạo & Nhỏ, chỉ 3 block, không giàu semantic/video \\
-UAVid & Video UAV 4K + semantic + depth phụ trợ & Rất hợp cho segmentation và monocular depth từ video & Không phải benchmark mạnh cho mesh/point cloud survey-grade \\
-Dronescapes & Video/ảnh UAV với nhiều nhãn cảm nhận & Hợp cho perception đa tác vụ & Ít chuẩn hơn UseGeo cho đánh giá MVS/mesh \\
-UAVStereo & Stereo/disparity & Tốt cho stereo benchmark & Quá hẹp nếu muốn làm toàn pipeline mapping \\
-Mid-Air & Synthetic đa modality & Rất tiện để debug hoặc pretrain & Không phù hợp để làm benchmark cuối \\
-UAV-VisLoc / AerialVL & Drone--satellite/cross-view & Mạnh cho định vị GNSS-denied & Không phải trọng tâm dense reconstruction \\
-MUN-FRL / AgriLiRa4D & Camera + LiDAR + IMU + RTK & Rất hợp cho SLAM đa cảm biến & Quá lệch sang multi-sensor, khó giữ đề tài gọn \\
-UAVScenes & Camera + LiDAR + semantic + pose & Giàu modality & Khá lớn và dễ kéo đề tài sang perception tổng hợp \\
-EuRoC MAV & Stereo + IMU indoor & Chuẩn cho VIO & Không phải UAV mapping ngoài trời \\
+DUSt3R & 345.054 & 447.936 & 0.9905 & 182.67 & 1.00 \\
+MASt3R & \textbf{343.628} & \textbf{446.506} & \textbf{0.9858} & 189.98 & 1.00 \\
+Risk-hybrid & 344.913 & 447.812 & 0.9900 & 363.64 & 0.25 \\
 \bottomrule
 \end{tabularx}
-\caption{Các dataset công khai tiêu biểu còn truy cập được đến ngày 03/05/2026, xét theo mức độ phù hợp với mục tiêu ``một dataset duy nhất'' cho tái tạo UAV.}
+\caption{Kết quả trên \texttt{dronescapes\_poc\_real}.}
+\label{tab:dronescapes-results}
 \end{table}
 
-\section{Vì sao UseGeo là lựa chọn phù hợp nhất}
-
-\textbf{UseGeo} được công bố đúng để đánh giá tái tạo 3D từ ảnh UAV \citep{Nex2024UseGeo}. Theo tài liệu chính thức, bộ dữ liệu này gồm \textbf{829 ảnh} chia trên \textbf{3 block độc lập}, ảnh có độ phân giải \textbf{7952$\times$5304}, có \textbf{ground-truth depth}, \textbf{camera poses}, \textbf{point cloud LiDAR} và \textbf{point cloud quang trắc}. Đây là tổ hợp rất hiếm nếu chỉ được phép dùng đúng một dataset mà vẫn muốn đánh giá:
+Bảng \ref{tab:dronescapes-results} cho thấy:
 \begin{enumerate}[leftmargin=1.5em]
-  \item sai số depth,
-  \item độ chính xác và độ đầy đủ của point cloud,
-  \item và chất lượng tái tạo 3D cuối cùng.
+  \item MASt3R full-pass đạt chất lượng tốt nhất về mọi metric chính;
+  \item risk-hybrid cải thiện nhẹ so với DUSt3R ở cả MAE, RMSE và AbsRel;
+  \item risk-hybrid chỉ refine \textbf{25\%} số frame, nhưng vẫn tiến khá sát MASt3R.
 \end{enumerate}
 
-So với các dataset video hoặc semantic, UseGeo có hai lợi thế quyết định. Thứ nhất, nó \textbf{phục vụ đúng câu hỏi hình học}. Thứ hai, đã tồn tại \textbf{protocol benchmark công khai} cho chính bộ dữ liệu này \citep{Hermann2024UseGeoEval}. Điều đó giúp tránh tình trạng đề tài phải dành quá nhiều công sức cho việc định nghĩa lại toàn bộ bộ đo.
+Đây là tín hiệu tốt cho luận điểm selective refinement. Tuy nhiên, runtime của risk-hybrid lại cao hơn đáng kể, do pipeline hiện tại vẫn phải trả giá cho cả:
+\begin{enumerate}[leftmargin=1.5em]
+  \item coarse pass toàn cục bằng DUSt3R,
+  \item refine pass cục bộ bằng MASt3R,
+  \item và bước merge hậu xử lý.
+\end{enumerate}
 
-Hệ quả là: nếu chỉ chọn một dataset, UseGeo cho phép khóa đề tài vào một câu hỏi rõ ràng hơn nhiều so với các bộ dữ liệu còn lại, đó là \textbf{đánh đổi giữa chất lượng tái tạo và ngân sách tính toán trên block ảnh UAV thật}.
+\subsection{Kết quả trên ODMData}
 
-\section{Đánh giá mức độ đã bị làm trước của hướng cũ}
+\begin{table}[t]
+\centering
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.1cm} >{\centering\arraybackslash}p{1.8cm} >{\centering\arraybackslash}p{1.8cm} >{\centering\arraybackslash}p{1.6cm} >{\centering\arraybackslash}p{1.8cm} >{\centering\arraybackslash}p{1.7cm}}
+\toprule
+\textbf{Phương pháp} & \textbf{MAE} & \textbf{RMSE} & \textbf{AbsRel} & \textbf{Runtime (s)} & \textbf{Selected ratio} \\
+\midrule
+DUSt3R & 0.1601 & 0.2492 & 0.0991 & 196.92 & 1.00 \\
+MASt3R (reference) & 0.0000 & 0.0000 & 0.0000 & 207.64 & 1.00 \\
+Risk-hybrid & \textbf{0.1202} & \textbf{0.2143} & \textbf{0.0772} & 456.44 & 0.276 \\
+\bottomrule
+\end{tabularx}
+\caption{Kết quả trên \texttt{odmdata\_odm\_poc\_mygla\_real}. Sai số của MASt3R bằng 0 vì đây là pseudo-reference cho run này.}
+\label{tab:odm-results}
+\end{table}
 
-Đánh giá từ văn liệu gần đây cho thấy phần lớn ý tưởng trong proposal cũ đã có tiền lệ khá gần.
+Trên ODMData, cần đọc Bảng \ref{tab:odm-results} cẩn thận. Vì MASt3R là pseudo-reference của run, hàng \texttt{mast3r\_real} không phải là một chiến thắng tuyệt đối mà chỉ là mốc neo. Điều đáng chú ý là:
+\begin{enumerate}[leftmargin=1.5em]
+  \item risk-hybrid tốt hơn rõ rệt so với DUSt3R trên mọi metric;
+  \item risk-hybrid chỉ refine khoảng \textbf{27.6\%} số frame;
+  \item khoảng cách của risk-hybrid tới reference nhỏ hơn đáng kể so với DUSt3R.
+\end{enumerate}
 
-Thứ nhất, benchmark chính thức trên UseGeo đã so sánh có hệ thống giữa offline MVS, online multi-view depth và single-image depth \citep{Hermann2024UseGeoEval}. Kết luận của nghiên cứu này đã rất rõ: mỗi họ phương pháp thắng ở một mặt, nhưng không có họ nào vừa nhanh vừa cho tái tạo 3D tốt đồng đều.
+Điều này cho thấy, trong không gian không có ground truth tuyệt đối nhưng có một lời giải tham chiếu hợp lý, selective refinement thực sự giúp kéo coarse reconstruction lại gần lời giải mạnh hơn.
 
-Thứ hai, nhánh \textbf{monocular prior để cứu các trường hợp khó của photogrammetry} đang tiến rất nhanh. Trên photogrammetry overlap thấp, monocular depth đã được dùng để tạo metric depth và lấp khoảng trống mà pipeline truyền thống bỏ sót \citep{Zhong2025LowOverlap}. Ở phía computer vision tổng quát hơn, monocular depth đã được ghép trực tiếp với SfM để dẫn hướng multi-view reconstruction \citep{Guo2025SfMGuided}. Điều này làm cho câu chuyện ``monocular depth + pose + fusion'' không còn mới nếu chỉ thay đổi một vài chi tiết kỹ thuật.
+\section{Thảo luận}
 
-Thứ ba, các mô hình direct 3D reconstruction hiện đại như DUSt3R, MASt3R và VGGT cũng đã được mang thử lên các block ảnh aerial của UseGeo \citep{Wu2025AerialBlocks}. Kết quả cho thấy các mô hình học sâu trực tiếp có tiềm năng trong tình huống cực thưa, nhưng vẫn chưa thay thế được SfM/MVS cổ điển ở overlap quang trắc thông thường.
+\subsection{Risk-hybrid hiện tốt ở đâu}
 
-Từ ba quan sát trên, có thể rút ra kết luận thẳng: \textbf{nếu tiếp tục theo hướng full-stack monocular metric depth rồi fuse toàn cục, novelty còn lại không cao}. Một đề tài mạnh hơn cần chuyển từ câu hỏi ``dựng depth thế nào'' sang câu hỏi ``phân bổ ngân sách tái tạo thế nào''.
+Kết quả hiện tại cho thấy \texttt{risk\_hybrid\_real} có ba ưu điểm rõ:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{ổn định hơn DUSt3R} về chất lượng hình học trên cả hai dataset;
+  \item \textbf{không cần refine toàn bộ tập ảnh};
+  \item \textbf{tiến gần MASt3R} trong khi chỉ dùng một phần ngân sách refine.
+\end{enumerate}
 
-\section{Khoảng trống nghiên cứu hợp lý khi chỉ dùng UseGeo}
+Nói cách khác, điểm mạnh thực sự của phương pháp nằm ở \textbf{hiệu quả sử dụng refinement budget}, không nằm ở việc giành best absolute accuracy.
 
-Sau khi loại bỏ những hướng đã bị phủ quá gần, khoảng trống nghiên cứu còn lại hợp lý nhất nằm ở \textbf{bài toán phân bổ tính toán}.
+\subsection{Risk-hybrid hiện chưa tốt ở đâu}
 
-\subsection{Gap 1: văn liệu đánh giá nhiều phương pháp, nhưng ít nghiên cứu phân bổ ngân sách tinh chỉnh trên một block UAV cố định}
+Điểm yếu lớn nhất của pipeline hiện tại là:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{runtime chưa tốt}. Trên cả Dronescapes và ODMData, risk-hybrid đều chậm hơn MASt3R full-pass trong run hiện tại;
+  \item \textbf{risk score còn heuristic}. Công thức hiện tại dựa trên overlap, texture, view và depth prior đơn giản, chưa học được uncertainty thực sự từ backbone;
+  \item \textbf{refinement ở mức frame còn thô}. Có thể nhiều scene chỉ cần refine vài tile hoặc patch nhỏ thay vì cả frame;
+  \item \textbf{đánh giá ODMData còn là pseudo-reference}. Điều này hữu ích cho development, nhưng không đủ để đưa ra kết luận tuyệt đối về hình học.
+\end{enumerate}
 
-Các nghiên cứu về SfM/MVS tập trung vào pair selection, scale, completeness hoặc accuracy \citep{Jiang2022Leveraging,Jiang2022Parallel,Liu2023Deep,Liao2024High,Jiang2024Efficient}. Các nghiên cứu về rapid mapping lại ưu tiên phản hồi nhanh ở mức bản đồ thô \citep{Campos2021ORB,Qin2018VINS,Liu2025ARTEMIS}. Nhưng với một \textbf{block ảnh đã cho trước}, câu hỏi ``nên chi ngân sách MVS đắt đỏ vào đâu trước'' vẫn chưa được đóng gói thành một bài toán nghiên cứu đủ rõ.
+\subsection{Ý nghĩa nghiên cứu}
 
-\subsection{Gap 2: thiếu một bản đồ rủi ro tái tạo gắn trực tiếp với aerial image block}
-
-Trong ảnh UAV, vùng khó thường đến từ sự kết hợp của nhiều nguyên nhân: baseline yếu, texture thấp, bề mặt lặp lại, che khuất cục bộ, hoặc depth prior kém tin cậy. Các công trình về uncertainty trong dense stereo và MVS cho thấy confidence là quan trọng \citep{Li2020Confidence}, nhưng việc đưa nó thành \textbf{risk map ở mức block ảnh UAV} để điều tiết bước tinh chỉnh vẫn còn thiếu.
-
-\subsection{Gap 3: thiếu baseline một-dataset, công bằng về ngân sách tính toán}
-
-Nhiều bài hiện so trực tiếp chất lượng cuối giữa MVS, direct depth hay neural reconstruction \citep{Wei2024LiDeNeRF,Wu2025AerialBlocks}. Tuy nhiên, nếu mục tiêu là \textbf{triển khai thực dụng}, điều cần đo không chỉ là chất lượng cuối, mà là \textbf{chất lượng thu được trên mỗi đơn vị ngân sách tính toán}. Đây là góc nhìn hợp lý hơn cho một đề tài gọn và vẫn có ý nghĩa.
-
-\section{Đề xuất hướng nghiên cứu: RGSR-UseGeo}
-
-\subsection{Luận điểm}
-
-Hướng nghiên cứu được đề xuất là \textbf{RGSR-UseGeo} (\textit{Risk-Guided Selective Refinement for UseGeo}). Mục tiêu không còn là thiết kế một pipeline UAV toàn năng, mà là trả lời câu hỏi:
-
+Từ góc nhìn học thuật, bài báo này chưa đủ để kết luận rằng selective refinement là giải pháp mạnh nhất. Nhưng nó đưa ra một thông điệp quan trọng:
 \begin{quote}
-Với một block ảnh UAV cố định của UseGeo, có thể giữ lại bao nhiêu chất lượng tái tạo nếu chỉ tinh chỉnh đắt đỏ ở những phần được dự báo là rủi ro cao?
+\textit{Selective refinement theo rủi ro có thể tạo ra chất lượng gần với full refinement, ngay cả khi chỉ tinh chỉnh một phần nhỏ số frame.}
 \end{quote}
 
-\subsection{Kiến trúc phương pháp}
+Nếu được tối ưu tốt hơn ở cấp độ hệ thống, đây là một hướng rất có triển vọng cho UAV reconstruction under budget.
 
-\textbf{Bước A: tái tạo thô trên toàn bộ block.}
-Toàn bộ khung hình đều được đưa qua một bước depth/reconstruction thô, có thể là:
+\subsection{Hướng phát triển tiếp theo}
+
+Bốn hướng tiếp theo hợp lý nhất là:
 \begin{enumerate}[leftmargin=1.5em]
-  \item monocular depth,
-  \item online multi-view depth nhẹ,
-  \item hoặc thậm chí depth proxy suy từ baseline truyền thống.
-\end{enumerate}
-Mục tiêu của bước này không phải tối đa hóa độ chính xác, mà là sinh một lớp hình học sơ bộ phủ toàn cảnh.
-
-\textbf{Bước B: ước lượng rủi ro tái tạo.}
-Với mỗi khung hình hoặc mỗi ô ảnh, xây dựng điểm rủi ro:
-\[
-R_i = \alpha B_i + \beta U_i + \gamma (1-T_i) + \delta V_i,
-\]
-trong đó:
-\begin{enumerate}[leftmargin=1.5em]
-  \item $B_i$ là độ thiếu hỗ trợ hình học từ láng giềng ảnh,
-  \item $U_i$ là bất định hoặc độ thiếu của depth sơ bộ,
-  \item $T_i$ là mức giàu texture,
-  \item $V_i$ là mức bất lợi về đa dạng góc nhìn.
-\end{enumerate}
-
-\textbf{Bước C: tinh chỉnh chọn lọc.}
-Chỉ các khung hình hoặc ô ảnh có $R_i$ cao nhất mới được đưa vào bước tinh chỉnh đắt đỏ hơn, chẳng hạn:
-\begin{enumerate}[leftmargin=1.5em]
-  \item MVS cục bộ,
-  \item refinement theo patch/tile,
-  \item hoặc fusion dày hơn với stride nhỏ hơn.
-\end{enumerate}
-
-\textbf{Bước D: hợp nhất đầu ra.}
-Hợp nhất tái tạo thô và phần tinh chỉnh chọn lọc để sinh:
-\begin{enumerate}[leftmargin=1.5em]
-  \item point cloud,
-  \item DSM hoặc height map,
-  \item và nếu cần thì mesh.
-\end{enumerate}
-
-\subsection{Điểm mới thực tế của hướng này}
-
-Điểm mới của hướng này không nằm ở bản thân monocular depth hay MVS, mà ở ba điểm sau:
-\begin{enumerate}[leftmargin=1.5em]
-  \item biến \textbf{rủi ro tái tạo} thành đối tượng tối ưu hóa chính;
-  \item đưa \textbf{ngân sách tính toán} vào định nghĩa bài toán thay vì chỉ so chất lượng cuối;
-  \item khóa toàn bộ đánh giá vào \textbf{một benchmark UAV thật có ground truth hình học}, giúp lập luận sạch hơn.
-\end{enumerate}
-
-Đây là novelty ở mức \textbf{vừa phải nhưng phòng thủ được}. Nó thực tế hơn nhiều so với việc tuyên bố một hệ UAV hợp nhất sẽ vượt trội trên mọi tiêu chí.
-
-\section{Triển khai hiện tại trong repo}
-
-Repo hiện tại đã có package thực nghiệm chạy được tại \texttt{src/geo\_uav\_recon}. Phần cài đặt này đã được cập nhật từ scaffold đơn-dataset ban đầu sang benchmark hai dataset \texttt{Dronescapes + ODMData}:
-
-\begin{table}[t]
-\centering
-\small
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}X}
-\toprule
-\textbf{Thành phần mã nguồn} & \textbf{Chức năng} \\
-\midrule
-\texttt{dataset.py} & dò cấu trúc \texttt{Dronescapes} và \texttt{ODMData}, đọc ảnh, pose và depth nếu có, rồi chuẩn hóa thành danh sách frame \\
-\texttt{realdata.py} & tải dữ liệu chính thức, kiểm tra dataset cục bộ, và tạo manifest sẵn sàng cho benchmark \\
-\texttt{predictors.py} & bọc các baseline ngoài như \texttt{DUSt3R}, \texttt{MASt3R}, và \texttt{COLMAP + OpenMVS} \\
-\texttt{risk.py} & tính điểm rủi ro tái tạo từ overlap, texture, depth gap và độ đa dạng góc nhìn \\
-\texttt{benchmark.py} & điều phối đánh giá, hỗ trợ pseudo-reference cho \texttt{ODMData}, và xuất báo cáo \\
-\texttt{cli.py} & cung cấp các lệnh chuẩn bị dữ liệu, kiểm tra, export và benchmark \\
-\bottomrule
-\end{tabularx}
-\caption{Package đã được cài trong repo cho hướng benchmark hiện tại của GEO.}
-\end{table}
-
-Hiện trạng triển khai này chưa phải là phương pháp công bố hoàn chỉnh. Nó là một \textbf{package thực nghiệm khả dụng} để:
-\begin{enumerate}[leftmargin=1.5em]
-  \item chuẩn bị và kiểm tra hai dataset thật của dự án,
-  \item chạy đầy đủ baseline cổ điển và học sâu,
-  \item xếp hạng frame theo rủi ro,
-  \item và benchmark selective refinement so với các phương pháp chạy full-pass.
-\end{enumerate}
-
-\section{Thiết kế thực nghiệm đề xuất}
-
-\subsection{Thiết lập dữ liệu}
-
-UseGeo có 3 block, nên cấu hình thực nghiệm hợp lý là:
-\begin{enumerate}[leftmargin=1.5em]
-  \item train hoặc tinh chỉnh trên 2 block,
-  \item test trên block còn lại,
-  \item xoay vòng theo kiểu leave-one-block-out.
-\end{enumerate}
-
-\subsection{Baseline nên so sánh}
-
-\begin{enumerate}[leftmargin=1.5em]
-  \item \textbf{MVS toàn phần}: COLMAP/OpenMVS hoặc một baseline trong benchmark UseGeo \citep{Hermann2024UseGeoEval};
-  \item \textbf{coarse-only}: chỉ dùng bước tái tạo thô trên toàn block;
-  \item \textbf{RGSR-UseGeo}: coarse + selective refinement;
-  \item \textbf{upper bound}: refinement dày cho toàn bộ frame.
-\end{enumerate}
-
-\subsection{Bộ đo}
-
-\begin{enumerate}[leftmargin=1.5em]
-  \item depth: L1, accuracy, completeness theo protocol của UseGeo \citep{Hermann2024UseGeoEval};
-  \item point cloud: accuracy và completeness so với LiDAR;
-  \item hiệu năng: runtime, peak memory, số điểm sinh ra;
-  \item hiệu quả ngân sách: chất lượng trên mỗi giây xử lý hoặc trên mỗi triệu điểm được dựng.
-\end{enumerate}
-
-\subsection{Ablation}
-
-\begin{enumerate}[leftmargin=1.5em]
-  \item có và không có texture term trong risk;
-  \item có và không có depth uncertainty/completeness term;
-  \item top-$K$ frame khác nhau;
-  \item stride thô và stride tinh chỉnh khác nhau;
-  \item frame-level refinement so với tile-level refinement.
+  \item học một \textbf{risk predictor} tốt hơn thay cho heuristic hiện tại;
+  \item chuyển từ \textbf{frame-level refinement} sang \textbf{tile-level refinement};
+  \item tái sử dụng feature hoặc latent của coarse pass để giảm overhead của refine pass;
+  \item đưa \texttt{COLMAP + OpenMVS} trở lại benchmark khi hạ tầng phần cứng ổn định hơn, nhằm hoàn thiện so sánh với nhánh photogrammetry cổ điển.
 \end{enumerate}
 
 \section{Kết luận}
 
-Với ràng buộc \textbf{chỉ một dataset}, hướng nghiên cứu hợp lý nhất không còn là một hệ UAV toàn năng, mà là một bài toán hẹp hơn nhưng rõ hơn: \textbf{tái tạo chọn lọc có điều phối theo rủi ro trên UseGeo}. UseGeo là bộ dữ liệu phù hợp nhất vì nó đồng thời cung cấp ảnh UAV thật, ground-truth depth, pose và tham chiếu LiDAR \citep{Nex2024UseGeo}. Đồng thời, đánh giá văn liệu cho thấy phần lõi của proposal cũ đã bị phủ khá mạnh bởi benchmark UseGeo, monocular depth cho photogrammetry overlap thấp và các phương pháp direct 3D reconstruction gần đây \citep{Hermann2024UseGeoEval,Zhong2025LowOverlap,Guo2025SfMGuided,Wu2025AerialBlocks}. Vì vậy, RGSR-UseGeo là một sự thu hẹp cần thiết: ít phô trương hơn, dễ triển khai hơn, và trung thực hơn về novelty.
+Bài báo này trình bày một phiên bản thực dụng của bài toán tái tạo 3D từ ảnh UAV, trong đó trọng tâm không phải là dựng hình học mạnh nhất có thể bằng full-pass trên mọi khung hình, mà là \textbf{chọn đúng nơi để chi refinement budget}. Trên hai dataset thật là Dronescapes và ODMData, phương pháp \texttt{risk\_hybrid\_real} cho thấy khả năng cải thiện nhất quán so với DUSt3R coarse-only và tiến gần kết quả của MASt3R, trong khi chỉ refine một phần nhỏ số frame.
 
-Phần mã nguồn đi kèm đã hiện thực hóa bước đầu của hướng này trong repo, đủ để làm nền cho giai đoạn thực nghiệm tiếp theo.
+Tuy vậy, kết quả hiện tại cũng chỉ ra giới hạn quan trọng: phiên bản implementation hiện tại \textbf{chưa vượt MASt3R về chất lượng tuyệt đối} và \textbf{chưa đạt lợi thế runtime}. Vì vậy, đóng góp của bài báo nên được hiểu đúng ở mức: \textbf{một bằng chứng thực nghiệm rằng selective refinement theo rủi ro là hướng nghiên cứu hợp lý}, chứ chưa phải một lời tuyên bố về một phương pháp tốt nhất tuyệt đối.
 
-\nocite{Jiang2022Leveraging,Jiang2022Parallel,Ye2024coarse,Wu2024UAV,Shen2025Aerial,Lateef2025GPS,Wang2025VecMapLocNet,Wei2024LiDeNeRF,Yu2021Automatic,Xu2021Robust,Zheng2018multi,Wu2018Integration,Zhang2018patch,Liu2025ARTEMIS,Li2024Drone}
+Nhìn từ góc độ dự án GEO, kết quả này là đủ để khẳng định rằng hướng nghiên cứu hiện tại đáng để tiếp tục đầu tư. Giá trị chính của hệ thống không còn nằm ở một benchmark đơn thuần, mà ở việc biến bài toán ``reconstruct everything'' thành ``reconstruct selectively and intelligently''.
+
+\nocite{Zhao2014Direct,Zheng2018multi,Wu2018Integration,Zhang2020UAV,Yu2021Automatic,Xu2021Robust,Chen2024End,Tong2024Large,Wu2024evaluation,Shi2025Accurate}
 
 \bibliographystyle{plainnat}
 \bibliography{references}

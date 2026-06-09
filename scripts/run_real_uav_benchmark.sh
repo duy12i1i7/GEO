@@ -154,7 +154,10 @@ export PYTHONPATH="$ROOT_DIR/src/geo_uav_recon${PYTHONPATH:+:$PYTHONPATH}"
 
 if [[ ${#ODM_ROOTS[@]} -eq 0 && -n "$ODM_OUTPUT_ROOT" ]]; then
   if [[ -n "$ODM_BENCHMARK_SUITE" ]]; then
-    mapfile -t ODM_SUITE_SAMPLES < <(
+    ODM_SUITE_SAMPLES=()
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && ODM_SUITE_SAMPLES+=("$line")
+    done < <(
       PYTHONPATH="$ROOT_DIR/src/geo_uav_recon${PYTHONPATH:+:$PYTHONPATH}" \
       "$PYTHON_BIN" - <<'PY' "$ODM_BENCHMARK_SUITE"
 from geo_uav_recon.realdata import resolve_odm_benchmark_suite
@@ -198,7 +201,10 @@ fi
 
 if [[ ${#DRONESCAPES_ROOTS[@]} -eq 0 && -n "$DRONESCAPES_OUTPUT_ROOT" ]]; then
   if [[ -n "$DRONESCAPES_BENCHMARK_SUITE" ]]; then
-    mapfile -t DRONESCAPES_SUITE_SPLITS < <(
+    DRONESCAPES_SUITE_SPLITS=()
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && DRONESCAPES_SUITE_SPLITS+=("$line")
+    done < <(
       PYTHONPATH="$ROOT_DIR/src/geo_uav_recon${PYTHONPATH:+:$PYTHONPATH}" \
       "$PYTHON_BIN" - <<'PY' "$DRONESCAPES_BENCHMARK_SUITE"
 from geo_uav_recon.realdata import resolve_dronescapes_benchmark_suite

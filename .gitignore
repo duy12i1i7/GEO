@@ -8,8 +8,8 @@ __pycache__/
 .venv-geo-uav-recon/
 .micromamba/
 .external/
-/data/
-/output/
+/data
+/output
 DensifyPointCloud-*.log
 InterfaceCOLMAP-*.log
 

@@ -1,0 +1,13 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Các hướng nghiên cứu lớn của 3D reconstruction và mức độ liên quan tới đề tài.}}{5}{table.2.1}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Cấu trúc thành phần chính của hệ thống GEO.}}{18}{table.5.1}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Một số tham số chính của implementation được dùng trong thực nghiệm báo cáo.}}{19}{table.5.2}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {6.1}{\ignorespaces Kết quả trên Dronescapes. Đây là các số ground-truth trực tiếp từ run server được chọn làm run báo cáo.}}{21}{table.6.1}%
+\contentsline {table}{\numberline {6.2}{\ignorespaces Kết quả trên ODMData khi so sánh tương đối với depth maps tham chiếu được dựng lại từ COLMAP/OpenMVS đã lưu.}}{22}{table.6.2}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }

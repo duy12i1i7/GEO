@@ -1,0 +1,47 @@
+\documentclass[../DoAn.tex]{subfiles}
+\begin{document}
+
+\section{Lý do chọn đề tài}
+
+Tái tạo không gian 3D từ ảnh UAV là một bài toán trung tâm trong photogrammetry, bản đồ số, khảo sát hiện trạng, giám sát công trình và robot thị giác \citep{Colomina2014Unmanned}. Sự phát triển của cảm biến giá rẻ, UAV dân dụng và hạ tầng tính toán đã khiến việc thu nhận dữ liệu ảnh từ trên không trở nên phổ biến hơn rất nhiều. Tuy nhiên, khi khối lượng ảnh tăng lên, bài toán không còn chỉ là dựng được mô hình 3D, mà là dựng được mô hình đó với mức chi phí tính toán có thể chấp nhận được.
+
+Các pipeline cổ điển như SfM kết hợp MVS có thể cho chất lượng hình học cao, nhưng chi phí chạy và công đoạn cài đặt tương đối lớn \citep{Schonberger2016SfM,Jiang2020Efficient,Liao2024High}. Ở chiều ngược lại, các mô hình pointmap gần đây như DUSt3R và MASt3R giúp đơn giản hóa đáng kể việc suy luận hình học trực tiếp từ ảnh \citep{Wang2024DUSt3R,Leroy2024MASt3R}. Dù vậy, việc chạy full-pass các mô hình nặng trên toàn bộ chuỗi ảnh vẫn đặt ra áp lực lớn về thời gian và tài nguyên.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\textwidth]{figures/web/odm_uav_arena.png}
+\caption{Một ví dụ benchmark UAV mapping trong hệ sinh thái OpenDroneMap. Hình này cho thấy rõ bối cảnh ứng dụng thực tế của bài toán: từ cùng một block ảnh UAV, hệ thống cần tạo ra các đầu ra hình học hoặc bản đồ có chất lượng tốt, đồng thời chi phí xử lý vẫn phải nằm trong mức chấp nhận được. Nguồn: OpenDroneMap UAV Mapping Arena.}
+\label{fig:motivation-uav-budget}
+\end{figure}
+
+Từ quan sát này, đề tài lựa chọn một câu hỏi thực dụng hơn: có nhất thiết phải refine toàn bộ frame hay không? Nếu có thể phát hiện những frame có rủi ro tái tạo cao và chỉ dồn ngân sách refine vào đó, pipeline có thể đạt được một điểm cân bằng tốt hơn giữa chất lượng và chi phí.
+
+\section{Mục tiêu của đồ án}
+
+Đồ án hướng đến bốn mục tiêu:
+\begin{enumerate}[leftmargin=1.5em]
+  \item khảo sát có hệ thống các hướng tiếp cận chính trong 3D reconstruction, đặc biệt là các nhánh liên quan trực tiếp tới ảnh UAV;
+  \item đề xuất một chiến lược \textit{risk-guided selective refinement} cho tái tạo hình học từ ảnh UAV;
+  \item xây dựng một pipeline benchmark độc lập, có khả năng chuẩn bị dữ liệu, chạy mô hình, so sánh baseline và xuất báo cáo;
+  \item đánh giá thực nghiệm phương pháp trên hai dataset thật là Dronescapes và ODMData.
+\end{enumerate}
+
+\section{Phạm vi nghiên cứu}
+
+Đề tài tập trung vào bài toán tái tạo hình học từ ảnh UAV trong thiết lập offline, ưu tiên độ ổn định của pipeline benchmark và trade-off giữa chất lượng với chi phí tính toán. Đồ án không theo đuổi các hướng như text-to-3D, human reconstruction hay dynamic scene reconstruction, và cũng không đặt mục tiêu tối ưu rendering hay novel-view synthesis như các hệ NeRF hoặc Gaussian Splatting thuần túy.
+
+\section{Đóng góp của đồ án}
+
+Các đóng góp chính gồm:
+\begin{enumerate}[leftmargin=1.5em]
+  \item hệ thống hóa bối cảnh nghiên cứu về 3D reconstruction và xác định vị trí của bài toán UAV reconstruction trong hệ sinh thái đó;
+  \item đề xuất và hiện thực hóa một pipeline \textit{risk-guided hybrid refinement} kết hợp DUSt3R và MASt3R;
+  \item xây dựng repo GEO như một framework benchmark độc lập cho UAV reconstruction;
+  \item cung cấp kết quả thực nghiệm định lượng và định tính trên hai dataset thật, kèm phân tích điểm mạnh, điểm yếu và giới hạn của phương pháp.
+\end{enumerate}
+
+\section{Bố cục báo cáo}
+
+Báo cáo được tổ chức như sau. Chương 2 trình bày tổng quan về 3D reconstruction và khảo sát các hướng tiếp cận chính. Chương 3 tóm tắt cơ sở lý thuyết cần cho đề tài. Chương 4 mô tả giải pháp đề xuất. Chương 5 trình bày thiết kế và cài đặt hệ thống GEO. Chương 6 trình bày thực nghiệm và đánh giá. Chương 7 kết luận và nêu hướng phát triển tiếp theo.
+
+\end{document}

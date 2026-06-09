@@ -1,0 +1,238 @@
+\documentclass[preprint,12pt]{elsarticle}
+
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{multirow}
+\usepackage{graphicx}
+\biboptions{numbers,sort&compress}
+
+\journal{ISPRS Journal of Photogrammetry and Remote Sensing}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{Risk-Guided Hybrid Refinement cho tái tạo hình học từ ảnh UAV: một nghiên cứu thực nghiệm trên Dronescapes và ODMData}
+
+\author{Tác giả bản thảo dự án GEO}
+\ead{placeholder@example.com}
+
+\begin{abstract}
+Bài báo này nghiên cứu một chiến lược tái tạo hình học từ ảnh UAV theo hướng tiết kiệm ngân sách tính toán. Thay vì refine toàn bộ chuỗi ảnh bằng một mô hình nặng, phương pháp đề xuất sử dụng DUSt3R để suy ra hình học thô trên toàn bộ tập ảnh, sau đó chấm điểm rủi ro cho từng khung hình và chỉ refine các khung hình có rủi ro cao bằng MASt3R. Pipeline resulting, gọi là \textit{risk-guided hybrid refinement}, được đánh giá trên hai dataset UAV thật là Dronescapes và ODMData. Trên Dronescapes, phương pháp đề xuất đạt RMSE 447.81, so với 447.94 của DUSt3R, trong khi chỉ refine 25\% số frame; trên ODMData ở chế độ pseudo-reference, phương pháp đề xuất cải thiện rõ rệt so với DUSt3R và tiến gần hơn tới lời giải tham chiếu. Tuy nhiên, kết quả cũng cho thấy phiên bản hiện tại chưa vượt MASt3R full-pass về độ chính xác tuyệt đối và chưa thắng về thời gian chạy. Kết luận chính là selective refinement theo rủi ro là một hướng có triển vọng để cân bằng chất lượng và chi phí, nhưng vẫn cần tối ưu sâu hơn để trở thành giải pháp vượt trội toàn diện.
+\end{abstract}
+
+\begin{keyword}
+UAV reconstruction \sep selective refinement \sep DUSt3R \sep MASt3R \sep Dronescapes \sep ODMData
+\end{keyword}
+
+\end{frontmatter}
+
+\section{Introduction}
+
+Image-based UAV reconstruction is now a mature research area spanning classical photogrammetry, structure-from-motion (SfM), multi-view stereo (MVS), and recent learning-based 3D vision systems \citep{Colomina2014Unmanned,Jiang2017Efficient,Jiang2020Efficient,Schonberger2016SfM,Liu2023Deep,Liao2024High}. In practical deployments, however, the main challenge is no longer only whether a system can reconstruct a scene, but whether it can do so under a limited computation budget.
+
+Classical pipelines such as COLMAP and downstream MVS methods remain strong baselines for geometric quality, yet they are expensive in both build and runtime cost \citep{Schonberger2016SfM}. At the same time, recent pointmap-based models such as DUSt3R and MASt3R significantly simplify dense geometric inference from image collections \citep{Wang2024DUSt3R,Leroy2024MASt3R}, but full-pass processing over every frame is still computationally demanding. This naturally raises a practical question: \textit{must every frame be refined equally?}
+
+This work explores a more selective alternative. The core hypothesis is that some frames are already ``easy'' after a coarse global pass, while others are geometrically risky due to weak overlap, low texture, or unfavorable viewpoint arrangement. If a system can identify these risky frames and spend expensive refinement only there, it may improve the quality--cost trade-off.
+
+Based on this idea, the paper proposes \textbf{risk-guided hybrid refinement}. The method first runs DUSt3R over the full image set, computes a frame-wise reconstruction risk score, and then applies MASt3R only to the top-ranked frames before merging coarse and refined outputs. The current implementation is benchmarked on two real UAV datasets: Dronescapes \citep{DronescapesDataset} and ODMData \citep{ODMDataBenchmarks}.
+
+The contributions of the paper are:
+\begin{enumerate}[leftmargin=1.5em]
+  \item a selective refinement formulation for UAV reconstruction under a computation budget;
+  \item an implementation in the GEO project that operationalizes this formulation with DUSt3R and MASt3R;
+  \item a two-dataset evaluation on Dronescapes and ODMData;
+  \item an experimental conclusion showing that the proposed method is promising as an efficiency-oriented strategy, although it is not yet the best absolute performer.
+\end{enumerate}
+
+\section{Related work}
+
+\subsection{UAV photogrammetry and image-based reconstruction}
+
+UAV photogrammetry has become an important platform for rapid mapping and 3D reconstruction \citep{Colomina2014Unmanned}. Research on efficient SfM for oblique or large-scale UAV imagery has improved pair selection, graph construction, and reconstruction scalability \citep{Jiang2017Efficient,Jiang2020Efficient,Jiang2022Leveraging,Jiang2022Parallel,Jiang2024Efficient}. In parallel, dense multi-view methods, both classical and deep learning based, have improved geometric completeness and robustness in challenging urban scenes \citep{Liu2023Deep,Liao2024High}.
+
+These methods generally process the image set relatively uniformly. This is reasonable in standard offline photogrammetry, but it leaves open the question of whether all frames truly deserve the same expensive refinement budget.
+
+\subsection{Learning-based geometric reconstruction}
+
+DUSt3R proposes direct pointmap prediction and relaxes classical projective constraints, thereby simplifying several 3D reconstruction tasks from uncalibrated image collections \citep{Wang2024DUSt3R}. MASt3R builds on DUSt3R and improves matching robustness and downstream geometric consistency by grounding image matching in 3D \citep{Leroy2024MASt3R}. Evaluations on aerial photogrammetric blocks have shown that DUSt3R- and MASt3R-style systems are highly promising, especially in sparse or geometrically difficult cases \citep{Wu2025AerialBlocks}.
+
+However, these models do not by themselves solve the budget allocation problem. A full-pass MASt3R run still carries a significant computational cost, particularly when scenes scale to many frames.
+
+\subsection{Confidence, uncertainty and selective processing}
+
+Confidence-aware dense reconstruction has long been recognized as essential for robust geometry \citep{Li2020Confidence}. Related ideas also appear in visual SLAM and mapping, where confidence and uncertainty help decide which observations deserve stronger updates \citep{Campos2021ORB,Qin2018VINS,Wang2024Benchmarking}. Yet a clear frame-level selective refinement pipeline for UAV image reconstruction remains underexplored. The present work addresses this gap by turning frame risk into the primary decision variable.
+
+\section{Method}
+
+\subsection{Problem formulation}
+
+Given an image set $\mathcal{I}=\{I_i\}_{i=1}^N$, the goal is to reconstruct scene geometry while reducing expensive refinement on frames that are already sufficiently explained by a coarse global pass. Let $\mathcal{S}\subseteq \mathcal{I}$ denote the subset selected for refinement. The optimization objective can be expressed conceptually as
+\[
+\min_{\mathcal{S}} \; \mathcal{L}_{geo}(\hat{\mathcal{D}}(\mathcal{I},\mathcal{S})) + \lambda \mathcal{C}(\mathcal{S}),
+\]
+where $\hat{\mathcal{D}}$ denotes the final merged reconstruction and $\mathcal{C}(\mathcal{S})$ captures computation cost.
+
+\subsection{Pipeline}
+
+The proposed pipeline has four stages:
+
+\textbf{Stage 1: coarse global reconstruction.}
+DUSt3R is applied to the entire dataset to provide a scene-wide coarse geometry prior.
+
+\textbf{Stage 2: frame-wise risk estimation.}
+For each frame, the system computes a risk score from four normalized terms:
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{overlap term} $O_i$, which grows when neighboring frames provide weaker support;
+  \item \textbf{texture term} $T_i$, which grows when local intensity variation is small;
+  \item \textbf{depth term} $D_i$, which represents uncertainty in an optional depth prior;
+  \item \textbf{view term} $V_i$, which reflects viewpoint disadvantage relative to the sequence center.
+\end{itemize}
+
+The implementation currently uses
+\[
+R_i = 0.35 O_i + 0.25 T_i + 0.20 D_i + 0.20 V_i.
+\]
+
+More specifically:
+\begin{enumerate}[leftmargin=1.5em]
+  \item $O_i$ is derived from one minus the average cosine similarity to neighboring grayscale frames;
+  \item $T_i$ is derived from one minus the normalized grayscale standard deviation;
+  \item $D_i$ is obtained from the dispersion of valid depth prior values when such a prior is enabled;
+  \item $V_i$ is proportional to the normalized distance from the temporal sequence center.
+\end{enumerate}
+
+\textbf{Stage 3: selective refinement.}
+Only the top-$K$ frames with highest $R_i$ are sent to MASt3R for refinement. In the main experiment reported here, $K=8$.
+
+\textbf{Stage 4: merge.}
+Refined depth predictions overwrite or merge with the DUSt3R coarse outputs, producing the final benchmarked reconstruction.
+
+\subsection{Interpretation of the contribution}
+
+The proposed contribution is not a new 3D backbone. Its novelty is instead in how the system treats \textit{where to spend refinement} as the optimization target. The method reframes UAV reconstruction from ``reconstruct every frame equally'' to ``reconstruct selectively under a budget''.
+
+\section{Experimental setup}
+
+\subsection{Datasets}
+
+\textbf{ODMData.} The benchmark uses the \texttt{mygla} sample from the official OpenDroneMap benchmark collection \citep{ODMDataBenchmarks}. The prepared dataset contains 29 frames in the current run.
+
+\textbf{Dronescapes.} The benchmark uses \texttt{test\_set\_annotated\_only} from Dronescapes \citep{DronescapesDataset}, with 32 frames in the reported POC configuration. A practical implementation detail is that the public Hugging Face version stores RGB data in \texttt{.npz} format; the GEO pipeline converts them into \texttt{.png} during export so that the benchmark uses a consistent image-depth structure.
+
+\subsection{Compared methods}
+
+The current benchmark includes:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{DUSt3R full-pass} (\texttt{dust3r\_real});
+  \item \textbf{MASt3R full-pass} (\texttt{mast3r\_real});
+  \item \textbf{risk-guided hybrid refinement} (\texttt{risk\_hybrid\_real}).
+\end{enumerate}
+
+Although the GEO framework also supports \texttt{COLMAP + OpenMVS}, the reported run is a neural-centered POC run and does not include the photogrammetric baseline.
+
+\subsection{Implementation details}
+
+The reported run on \texttt{avis@100.96.109.77} uses:
+\begin{itemize}[leftmargin=1.5em]
+  \item coarse image size: 224;
+  \item refine image size: 384;
+  \item batch size: 1;
+  \item window size: 2;
+  \item top-$K$ frames: 8;
+  \item risk neighbors: 4;
+  \item coarse/refine device: CUDA.
+\end{itemize}
+
+The hardware is:
+\begin{itemize}[leftmargin=1.5em]
+  \item Intel Core Ultra 9 285K;
+  \item 60~GiB RAM;
+  \item NVIDIA RTX 5000 Ada 32~GiB;
+  \item Ubuntu 24.04.4.
+\end{itemize}
+
+\subsection{Metrics}
+
+For Dronescapes, the benchmark reports MAE, RMSE, AbsRel, valid ratio, and runtime. For ODMData, there is no direct ground-truth depth in the present setup, so the run is evaluated in \textbf{pseudo-reference mode}. In this run, MASt3R serves as the reference method, meaning that its ODMData error values are zero by construction and should be interpreted only as a reference anchor rather than an absolute optimum.
+
+\section{Results}
+
+\subsection{Dronescapes}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+Method & MAE & RMSE & AbsRel & Runtime (s) & Selected ratio \\
+\midrule
+DUSt3R & 345.054 & 447.936 & 0.9905 & 182.67 & 1.00 \\
+MASt3R & \textbf{343.628} & \textbf{446.506} & \textbf{0.9858} & 189.98 & 1.00 \\
+Risk-hybrid & 344.913 & 447.812 & 0.9900 & 363.64 & 0.25 \\
+\bottomrule
+\end{tabular}
+\caption{Results on \texttt{dronescapes\_poc\_real}.}
+\label{tab:dronescapes}
+\end{table}
+
+Table \ref{tab:dronescapes} shows three clear observations. First, MASt3R full-pass remains the strongest method in absolute depth accuracy. Second, risk-hybrid improves slightly but consistently over DUSt3R. Third, risk-hybrid achieves this while refining only 25\% of the frames. This validates the selective refinement hypothesis, even though the current implementation does not yet win on runtime.
+
+\subsection{ODMData}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+Method & MAE & RMSE & AbsRel & Runtime (s) & Selected ratio \\
+\midrule
+DUSt3R & 0.1601 & 0.2492 & 0.0991 & 196.92 & 1.00 \\
+MASt3R (reference) & 0.0000 & 0.0000 & 0.0000 & 207.64 & 1.00 \\
+Risk-hybrid & \textbf{0.1202} & \textbf{0.2143} & \textbf{0.0772} & 456.44 & 0.276 \\
+\bottomrule
+\end{tabular}
+\caption{Results on \texttt{odmdata\_odm\_poc\_mygla\_real}. MASt3R is the pseudo-reference for this run.}
+\label{tab:odm}
+\end{table}
+
+On ODMData, the important comparison is between risk-hybrid and DUSt3R. Since MASt3R is the pseudo-reference, its zero error is not an absolute performance claim. Relative to DUSt3R, the proposed method moves noticeably closer to the reference while refining only about 27.6\% of the frames. This supports the argument that selective refinement can improve reconstruction quality in a meaningful way under a bounded refinement budget.
+
+\section{Discussion}
+
+The main strength of the current method is not best absolute accuracy, but \textbf{better use of refinement budget}. On both datasets, risk-hybrid narrows the gap between a coarse full-pass solution and a stronger full-pass solution while refining only a subset of frames. This is exactly the behavior the method was designed to encourage.
+
+At the same time, the current implementation has two major weaknesses. First, its runtime is not yet competitive. The overhead of running DUSt3R globally, MASt3R selectively, and then merging outputs currently offsets the computational savings that selective refinement should ideally provide. Second, the risk model is still heuristic. The present score is hand-designed and does not yet learn uncertainty or reconstructability directly from data.
+
+The ODMData results should also be interpreted carefully because they rely on pseudo-reference evaluation. They are useful for development and ranking relative behavior, but they do not substitute for a true metric geometry benchmark.
+
+Overall, the results suggest that risk-guided refinement is a \textbf{promising research direction}, but not yet a superior end-to-end method. Future work should focus on learned risk prediction, tile-level rather than frame-level refinement, and feature reuse that reduces refinement overhead.
+
+\section{Conclusion}
+
+This paper presented a practical selective-refinement strategy for UAV image-based reconstruction. The proposed risk-guided hybrid refinement combines a global DUSt3R coarse pass with MASt3R refinement on only the most risky frames. Experiments on Dronescapes and ODMData show that the method improves consistently over DUSt3R and approaches MASt3R quality while refining only a fraction of frames.
+
+However, the current implementation does not yet surpass MASt3R in absolute accuracy or overall runtime. The correct conclusion is therefore not that the proposed method is already the best solution, but that \textbf{risk-aware selective refinement is a credible and empirically supported direction for computation-aware UAV reconstruction}. In the context of the GEO project, this is a useful and defensible research outcome.
+
+\section*{CRediT authorship contribution statement}
+Conceptualization, methodology, software, validation, investigation, writing---original draft, and writing---review \& editing: project authoring team of GEO.
+
+\section*{Declaration of competing interest}
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+
+\section*{Data availability}
+The experiments are based on public UAV datasets. Dronescapes is available from the official project website and mirrored dataset distribution channels \citep{DronescapesDataset}. ODM benchmark samples are available from the official OpenDroneMap benchmark repository \citep{ODMDataBenchmarks}. The GEO codebase used to run the experiments is maintained in the project repository.
+
+\section*{Acknowledgements}
+This manuscript was prepared from the GEO project benchmark framework and associated experimental runs. No external funding statement is included in the current draft.
+
+\nocite{Zhao2014Direct,Zheng2018multi,Wu2018Integration,Zhang2020UAV,Yu2021Automatic,Xu2021Robust,Chen2024End,Tong2024Large,Wu2024evaluation,Shi2025Accurate}
+
+\bibliographystyle{elsarticle-num}
+\bibliography{references}
+
+\end{document}

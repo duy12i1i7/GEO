@@ -1,0 +1,10 @@
+\documentclass[../DoAn.tex]{subfiles}
+\begin{document}
+
+\begin{center}
+    \Large{\textbf{ABSTRACT}}\\
+\end{center}
+\vspace{1cm}
+This thesis studies UAV image-based geometric reconstruction under explicit computational constraints. Instead of refining all frames with an expensive model, the proposed pipeline follows a risk-guided hybrid refinement strategy. DUSt3R is first used to obtain coarse geometry across the whole scene. A reconstruction risk score is then computed for each frame using overlap, texture, depth prior, and viewpoint cues. Only the high-risk frames are refined by MASt3R, and the refined outputs are merged back into the final prediction. The resulting GEO framework includes dataset preparation, benchmarking, visualization, and reproducible run scripts. Experiments on the real UAV datasets Dronescapes and ODMData show that the proposed method consistently improves over the coarse DUSt3R baseline while refining only a subset of frames. The method does not yet surpass full-pass MASt3R in absolute accuracy, but it demonstrates that selective refinement is a promising direction for compute-aware UAV reconstruction.
+
+\end{document}

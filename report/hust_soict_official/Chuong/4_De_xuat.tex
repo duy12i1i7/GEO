@@ -1,0 +1,88 @@
+\documentclass[../DoAn.tex]{subfiles}
+\begin{document}
+
+\section{Phát biểu bài toán}
+
+Cho tập ảnh UAV $\mathcal{I}=\{I_i\}_{i=1}^{N}$, mục tiêu là sinh ra một đầu ra hình học đủ tốt trong khi tránh refine toàn bộ frame. Gọi $\mathcal{S}$ là tập frame được chọn để refine, ta muốn tìm một chiến lược sao cho:
+\[
+\min_{\mathcal{S}} \; \mathcal{L}_{geo}(\hat{\mathcal{D}}(\mathcal{I}, \mathcal{S})) + \lambda \mathcal{C}(\mathcal{S}),
+\]
+trong đó $\mathcal{L}_{geo}$ đo lỗi hình học sau khi hợp nhất coarse và refine, còn $\mathcal{C}(\mathcal{S})$ đo chi phí suy luận tăng thêm.
+
+\section{Ý tưởng chính}
+
+Thay vì chạy MASt3R trên toàn bộ tập ảnh, đề tài đề xuất:
+\begin{enumerate}[leftmargin=1.5em]
+  \item chạy DUSt3R toàn cục để có lớp geometry thô;
+  \item chấm điểm rủi ro cho từng frame;
+  \item chọn top-$K$ frame có rủi ro cao nhất;
+  \item refine chúng bằng MASt3R;
+  \item hợp nhất coarse prediction và refined prediction thành đầu ra cuối.
+\end{enumerate}
+
+\section{Công thức risk score}
+
+Trong implementation hiện tại:
+\[
+R_i = 0.35 O_i + 0.25 T_i + 0.20 D_i + 0.20 V_i,
+\]
+trong đó:
+\begin{itemize}[leftmargin=1.5em]
+  \item $O_i$ là thành phần overlap;
+  \item $T_i$ là thành phần texture;
+  \item $D_i$ là thành phần depth prior;
+  \item $V_i$ là thành phần viewpoint.
+\end{itemize}
+
+\textbf{Overlap term.} Thành phần này tăng khi một frame nhận được ít hỗ trợ hình học từ các frame lân cận. Trong code, nó được xấp xỉ từ one-minus-average cosine similarity giữa các ảnh xám lân cận.
+
+\textbf{Texture term.} Thành phần này tăng khi độ lệch chuẩn mức xám thấp, tức vùng ảnh nghèo texture hơn và dễ dẫn đến matching kém ổn định.
+
+\textbf{Depth term.} Thành phần này phản ánh độ phân tán của prior depth nếu có. Trong các run benchmark chính của đề tài, thành phần này thường không phải nguồn phân biệt mạnh nhất, nhưng vẫn được giữ trong formulation để pipeline có thể mở rộng sau này.
+
+\textbf{View term.} Thành phần này phản ánh mức bất lợi của vị trí nhìn trong chuỗi, được xấp xỉ bằng khoảng cách chuẩn hóa tới trung tâm của chuỗi ảnh.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  block/.style={rounded corners, draw=black!65, thick, align=center, minimum height=1cm, text width=2.7cm, fill=blue!8},
+  select/.style={rounded corners, draw=orange!80!black, thick, align=center, minimum height=1cm, text width=2.8cm, fill=orange!15},
+  result/.style={rounded corners, draw=green!50!black, thick, align=center, minimum height=1cm, text width=3cm, fill=green!12},
+  arrow/.style={-{Latex[length=3mm]}, thick}
+]
+\node[block] (coarse) {DUSt3R\\coarse pass};
+\node[block, right=1.2cm of coarse] (factors) {Overlap\\Texture\\Depth prior\\Viewpoint};
+\node[select, right=1.2cm of factors] (risk) {Tính risk score\\cho từng frame};
+\node[select, right=1.2cm of risk] (topk) {Chọn top-$K$\\frame rủi ro cao};
+\node[result, below=1.2cm of risk] (mast3r) {MASt3R refine\\trên tập con};
+\node[result, left=1.2cm of mast3r] (merge) {Merge coarse\\và refined output};
+
+\draw[arrow] (coarse) -- (factors);
+\draw[arrow] (factors) -- (risk);
+\draw[arrow] (risk) -- (topk);
+\draw[arrow] (topk) |- (mast3r);
+\draw[arrow] (coarse) |- (merge);
+\draw[arrow] (mast3r) -- (merge);
+\end{tikzpicture}
+\caption{Khung tính điểm rủi ro và cơ chế chọn lọc refinement của phương pháp đề xuất.}
+\label{fig:risk-pipeline}
+\end{figure}
+
+\section{Thuật toán pipeline}
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item Nhận tập ảnh UAV đầu vào.
+  \item Chạy DUSt3R trên toàn bộ ảnh để tạo coarse depth hoặc pointmap.
+  \item Với mỗi frame, tính $R_i$.
+  \item Sắp xếp các frame theo $R_i$ giảm dần.
+  \item Chọn top-$K$ frame.
+  \item Chạy MASt3R trên top-$K$ frame đã chọn.
+  \item Ghi đè hoặc hợp nhất kết quả refine vào coarse output.
+  \item Xuất metric, visualization và báo cáo benchmark.
+\end{enumerate}
+
+\section{Ý nghĩa của novelty}
+
+Điểm mới của đề tài không nằm ở việc phát minh một backbone 3D mới. Novelty nằm ở chỗ biến quyết định ``refine ở đâu'' thành trọng tâm tối ưu. Đây là một thay đổi nhỏ về cấu trúc bài toán, nhưng có ý nghĩa thực dụng rõ ràng khi ngân sách tính toán là yếu tố giới hạn.
+
+\end{document}

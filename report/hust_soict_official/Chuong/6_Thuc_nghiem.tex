@@ -1,0 +1,150 @@
+\documentclass[../DoAn.tex]{subfiles}
+\begin{document}
+
+\section{Dataset sử dụng}
+
+\textbf{Dronescapes.} Đây là benchmark UAV có dữ liệu depth chuẩn để đo định lượng. Trong run báo cáo, đề tài dùng split \texttt{test\_set\_annotated\_only} với 32 frame cho cấu hình POC ổn định.
+
+\textbf{ODMData.} Đây là tập hợp các block photogrammetry UAV thật do OpenDroneMap công bố. Run báo cáo dùng sample \texttt{mygla} với 29 frame. Vì không có ground-truth depth trực tiếp theo cùng giao thức như Dronescapes, việc so sánh ở dataset này được diễn giải là so sánh tương đối dựa trên các depth maps tham chiếu được chiếu từ một bản tái tạo COLMAP/OpenMVS đã lưu.
+
+\section{Các phương pháp so sánh}
+
+Thực nghiệm báo cáo ba nhánh học sâu chính:
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{DUSt3R full-pass};
+  \item \textbf{MASt3R full-pass};
+  \item \textbf{risk-guided hybrid refinement}.
+\end{enumerate}
+
+Nhánh \texttt{COLMAP + OpenMVS} vẫn tồn tại trong framework GEO, nhưng không phải là phần trung tâm của run POC hiện được dùng làm bộ số chính cho đồ án.
+
+\section{Kết quả định lượng trên Dronescapes}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Phương pháp} & \textbf{MAE} & \textbf{RMSE} & \textbf{AbsRel} & \textbf{Selected ratio} \\
+\midrule
+DUSt3R & 345.054 & 447.936 & 0.9905 & 1.00 \\
+MASt3R & \textbf{343.628} & \textbf{446.506} & \textbf{0.9858} & 1.00 \\
+Risk-hybrid & 344.913 & 447.812 & 0.9900 & 0.25 \\
+\bottomrule
+\end{tabular}
+\caption{Kết quả trên Dronescapes. Đây là các số ground-truth trực tiếp từ run server được chọn làm run báo cáo.}
+\label{tab:dronescapes-thesis}
+\end{table}
+
+Bảng \ref{tab:dronescapes-thesis} cho thấy MASt3R full-pass vẫn là phương pháp mạnh nhất về độ chính xác tuyệt đối. Tuy nhiên, risk-hybrid cải thiện nhất quán so với DUSt3R và đạt độ chính xác khá sát MASt3R trong khi chỉ refine 25\% số frame. Điều này ủng hộ giả thuyết rằng risk score hiện tại đã chọn được các frame mang giá trị hình học cao.
+
+\section{Kết quả định lượng trên ODMData}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Phương pháp} & \textbf{MAE} & \textbf{RMSE} & \textbf{AbsRel} & \textbf{Selected ratio} \\
+\midrule
+DUSt3R & 0.1576 & 0.2184 & 0.0337 & 1.00 \\
+MASt3R & \textbf{0.1299} & \textbf{0.1801} & \textbf{0.0274} & 1.00 \\
+Risk-hybrid & 0.1584 & 0.2188 & 0.0340 & 0.069 \\
+\bottomrule
+\end{tabular}
+\caption{Kết quả trên ODMData khi so sánh tương đối với depth maps tham chiếu được dựng lại từ COLMAP/OpenMVS đã lưu.}
+\label{tab:odm-thesis}
+\end{table}
+
+Trên ODMData, MASt3R là phương pháp gần nhất với bộ depth tham chiếu. Risk-hybrid hiện vẫn ở cùng dải sai số với DUSt3R, nhưng đạt được điều đó khi chỉ refine khoảng 6.9\% số frame. Điều này cho thấy selective refinement đã giúp tiết kiệm đáng kể ngân sách refine, nhưng bản thân formulation hiện tại vẫn chưa đủ mạnh để vượt full-pass MASt3R trong thiết lập này.
+
+\section{Kết quả định tính}
+
+Hình \ref{fig:qualitative-grid-thesis} tổng hợp chín panel trực quan theo bố cục 3x3. Hàng đầu là depth prediction trên Dronescapes, hàng hai là error map trên Dronescapes, và hàng ba là depth prediction trên ODMData. Bố cục này giúp nhìn rõ mối quan hệ giữa ba nhánh: coarse baseline, strong full-pass baseline và selective-refinement pipeline.
+
+\begin{figure}[p]
+\centering
+\begin{minipage}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dronescapes_dust3r_depth.pdf}
+
+\small (a) Dronescapes, DUSt3R depth
+\end{minipage}\hfill
+\begin{minipage}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dronescapes_mast3r_depth.pdf}
+
+\small (b) Dronescapes, MASt3R depth
+\end{minipage}\hfill
+\begin{minipage}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dronescapes_risk_depth.pdf}
+
+\small (c) Dronescapes, risk-hybrid depth
+\end{minipage}
+
+\vspace{0.8em}
+
+\begin{minipage}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dronescapes_dust3r_error.pdf}
+
+\small (d) Dronescapes, DUSt3R error
+\end{minipage}\hfill
+\begin{minipage}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dronescapes_mast3r_error.pdf}
+
+\small (e) Dronescapes, MASt3R error
+\end{minipage}\hfill
+\begin{minipage}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/dronescapes_risk_error.pdf}
+
+\small (f) Dronescapes, risk-hybrid error
+\end{minipage}
+
+\vspace{0.8em}
+
+\begin{minipage}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/odmdata_dust3r_depth.pdf}
+
+\small (g) ODMData, DUSt3R depth
+\end{minipage}\hfill
+\begin{minipage}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/odmdata_mast3r_depth.pdf}
+
+\small (h) ODMData, MASt3R depth
+\end{minipage}\hfill
+\begin{minipage}[t]{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/odmdata_risk_depth.pdf}
+
+\small (i) ODMData, risk-hybrid depth
+\end{minipage}
+\caption{Mega-figure 3x3 cho kết quả định tính. Risk-hybrid cải thiện rõ coarse behavior của DUSt3R và giữ được cấu trúc lớn của scene, nhưng vẫn chưa ổn định bằng MASt3R full-pass ở mọi vùng khó.}
+\label{fig:qualitative-grid-thesis}
+\end{figure}
+
+\section{Thảo luận}
+
+Từ các bảng và hình trên, có thể rút ra ba nhận xét chính.
+
+Thứ nhất, \textbf{thế mạnh lớn nhất của risk-hybrid không phải là điểm số tuyệt đối tốt nhất, mà là hiệu quả phân bổ refinement budget}. Phương pháp này cho kết quả tốt hơn DUSt3R trên Dronescapes và giữ mức cạnh tranh trên ODMData trong khi chỉ refine một phần nhỏ số frame.
+
+Thứ hai, \textbf{MASt3R vẫn là upper baseline mạnh hơn về độ chính xác}. Vì thế, nếu mục tiêu duy nhất là best accuracy, thì pipeline đề xuất hiện chưa đủ mạnh để thay thế full-pass MASt3R.
+
+Thứ ba, \textbf{risk score hiện tại còn heuristic}. Nó đã đủ tốt để tạo ra tín hiệu nghiên cứu, nhưng chưa đủ giàu để học được những mẫu bất định phức tạp hơn. Đây là điểm cần mở rộng nếu muốn đề tài tiến xa hơn thành một hướng nghiên cứu mạnh.
+
+\section{Giới hạn của đồ án}
+
+Đồ án hiện còn ba giới hạn chính:
+\begin{enumerate}[leftmargin=1.5em]
+  \item risk score chưa được học từ dữ liệu mà vẫn dựa trên quy tắc thủ công;
+  \item bộ thực nghiệm full với mọi suite lớn vẫn phụ thuộc mạnh vào điều kiện phần cứng;
+  \item benchmark trên ODMData mới mang tính so sánh tương đối, chưa thay thế được một benchmark có ground-truth hình học trực tiếp.
+\end{enumerate}
+
+\end{document}
