@@ -50,9 +50,14 @@ def _find_first_dir_with_images(root: Path) -> Path | None:
     candidates = [root]
     candidates.extend(path for path in root.glob("*") if path.is_dir())
     candidates.extend(path for path in root.glob("*/*") if path.is_dir())
+    allowed = {ext.lower() for ext in IMAGE_EXTENSIONS}
     for candidate in candidates:
-        if any(any(candidate.glob(f"*{ext}")) for ext in IMAGE_EXTENSIONS):
-            return candidate
+        try:
+            for path in candidate.iterdir():
+                if path.is_file() and path.suffix.lower() in allowed:
+                    return candidate
+        except PermissionError:
+            pass
     return None
 
 
